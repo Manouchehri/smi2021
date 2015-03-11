@@ -353,7 +353,23 @@ static void parse_trc(struct smi2021 *smi2021, u8 trc)
 	struct smi2021_buf *buf = smi2021->cur_buf;
 	int lines_per_field = smi2021->cur_height / 2;
 	int line = 0;
+bool NOT_MATCH = true;
 
+/*	if (is_sav(trc)) {
+		NOT_MATCH=false;
+		dev_info(smi2021->dev, "Parse TRC = %x = is_sav\n", trc);
+	}
+	if (is_field2(trc)) {
+		NOT_MATCH=false;
+		dev_info(smi2021->dev, "Parse TRC = %x = is_field2\n", trc);
+	}
+	if (is_active_video(trc)) {
+		NOT_MATCH=false;
+		dev_info(smi2021->dev, "Parse TRC = %x = is_active_video\n", trc);
+	}
+	if (NOT_MATCH) {
+		dev_info(smi2021->dev, "Parse TRC = %x = NOT_MATCH\n", trc);
+	} */
 	if (!buf) {
 		if (!is_sav(trc))
 			return;
@@ -367,6 +383,8 @@ static void parse_trc(struct smi2021 *smi2021, u8 trc)
 		buf = smi2021_get_buf(smi2021);
 		if (!buf)
 			return;
+
+smi2021->skip_frame = false;
 
 		smi2021->cur_buf = buf;
 	}
@@ -383,11 +401,15 @@ static void parse_trc(struct smi2021 *smi2021, u8 trc)
 
 		if (!buf->second_field && is_field2(trc)) {
 			line = buf->pos / SMI2021_BYTES_PER_LINE;
-			if (line < lines_per_field)
+			if (line < lines_per_field) {
+	//			buf->trc_av++;
+	dev_info(smi2021->dev, " SKIPPEDDDD = rougth TRC COPY = %d\n", lines_per_field);
 				goto buf_done;
+			}
 
 			buf->second_field = true;
 			buf->trc_av = 0;
+			
 		}
 
 		if (buf->second_field && !is_field2(trc))
@@ -403,7 +425,7 @@ buf_done:
 	smi2021_buf_done(smi2021);
 }
 
-static void copy_video(struct smi2021 *smi2021, u8 p)
+/* static void copy_video(struct smi2021 *smi2021, u8 p)
 {
 	struct smi2021_buf *buf = smi2021->cur_buf;
 
@@ -430,13 +452,74 @@ static void copy_video(struct smi2021 *smi2021, u8 p)
 			line -= lines_per_field;
 
 	if (line != buf->trc_av - 1) {
-		/* Keep video synchronized.
-		 * The device will sometimes give us too many bytes
-		 * for a line, before we get a new TRC.
-		 * We just drop these bytes */
+		// Keep video synchronized.
+		 // The device will sometimes give us too many bytes
+		 // for a line, before we get a new TRC.
+		 // We just drop these bytes //
 		return;
 	}
 
+	if (buf->second_field)
+		offset += SMI2021_BYTES_PER_LINE;
+
+	offset += (SMI2021_BYTES_PER_LINE * line * 2) + pos_in_line;
+
+	// Will this ever happen?
+	if (offset >= buf->length)
+		return;
+
+	dst = buf->mem + offset;
+	*dst = p;
+	buf->pos++;
+}*/
+
+static void copy_video_char(struct smi2021 *smi2021, u8 p)
+{
+	struct smi2021_buf *buf = smi2021->cur_buf;
+
+	int lines_per_field = smi2021->cur_height / 2;
+	int line = 0;
+	int pos_in_line = 0;
+	unsigned int offset = 0;
+	u8 *dst;
+
+if (smi2021->skip_frame)
+	return;
+
+	if (!buf) {
+//		dev_warn(smi2021->dev, "CHARR buf == NULL\n");
+smi2021->skip_frame = true;
+		return;
+	}
+
+	if (buf->in_blank) {
+		dev_warn(smi2021->dev, "CHARR buf->in_blank\n");
+		return;
+	}
+
+	if (buf->pos >= buf->length) {
+		dev_warn(smi2021->dev, "CHARR buf->pos >= buf->length\n");
+		smi2021_buf_done(smi2021);
+		return;
+	}
+
+	pos_in_line = buf->pos % SMI2021_BYTES_PER_LINE;
+	line = buf->pos / SMI2021_BYTES_PER_LINE;
+	if (line >= lines_per_field) {
+			dev_warn(smi2021->dev, "CHARR line >= lines_per_field\n");
+			line -= lines_per_field;
+	}
+
+/*	if (line != buf->trc_av - 1) {
+		// Keep video synchronized.
+		 // The device will sometimes give us too many bytes
+		 // for a line, before we get a new TRC.
+		 // We just drop these bytes
+			dev_warn(smi2021->dev, "CHARR TRC_AV\n");
+		return;
+	}*/
+
+//	if (smi2021->sekond_frame)
 	if (buf->second_field)
 		offset += SMI2021_BYTES_PER_LINE;
 
@@ -451,6 +534,81 @@ static void copy_video(struct smi2021 *smi2021, u8 p)
 	buf->pos++;
 }
 
+static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
+{
+	struct smi2021_buf *buf = smi2021->cur_buf;
+
+	int lines_per_field = smi2021->cur_height / 2;
+	int line = 0;
+	int pos_in_line = 0;
+	unsigned int offset = 0;
+	u8 *dst;
+
+	int start_corr, end_copy, len_copy;
+	start_corr = 0;
+	len_copy = size;
+
+if (smi2021->skip_frame)
+	return;
+
+	if (!buf) {
+		dev_warn(smi2021->dev, "BLOCK buf == NULL\n");
+smi2021->skip_frame = true;
+		return;
+	}
+
+	if (buf->in_blank) {
+		dev_warn(smi2021->dev, "BLOCK buf->in_blank\n");
+		return;
+	}
+
+	if (buf->pos >= buf->length) {
+		dev_warn(smi2021->dev, "BLOCK buf->pos >= buf->length\n");
+		smi2021_buf_done(smi2021);
+		return;
+	}
+
+	pos_in_line = buf->pos % SMI2021_BYTES_PER_LINE;
+	line = buf->pos / SMI2021_BYTES_PER_LINE;
+	if (line >= lines_per_field) {
+			dev_warn(smi2021->dev, "BLOCK line >= lines_per_field\n");
+			line -= lines_per_field;
+	}
+
+//	if (line != buf->trc_av - 1) {
+		/* Keep video synchronized.
+		 * The device will sometimes give us too many bytes
+		 * for a line, before we get a new TRC.
+		 * We just drop these bytes */
+//		return;
+//	}
+
+	//if (smi2021->sekond_frame)
+	if (buf->second_field)
+		offset += SMI2021_BYTES_PER_LINE;
+
+	offset += (SMI2021_BYTES_PER_LINE * line * 2) + pos_in_line;
+
+	/* Will this ever happen? */
+//	if (offset >= buf->length)
+//		return;
+
+/*	if (buf->pos >= buf->length) {
+		smi2021_buf_done(smi2021);
+		return;
+	} */
+	dst = buf->mem + offset;
+	if ( ( buf->pos + size ) >= buf->length ) {
+		len_copy = buf->length - (buf->pos + size);
+		dev_warn(smi2021->dev, "CROP copy_video_block %d\n", (buf->pos + size) - buf->length);
+	}
+	//*dst = p;
+	if ( len_copy > 0) {
+		memcpy(dst, p, len_copy );
+		buf->pos = buf->pos + len_copy;
+	}
+}
+
 /*
  * Scan the saa7113 Active video data.
  * This data is:
@@ -463,7 +621,7 @@ static void copy_video(struct smi2021 *smi2021, u8 p)
  * EAV = End Active Video.
  * This is described in the saa7113 datasheet.
  */
-static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
+/*static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
 {
 	int i;
 
@@ -500,6 +658,132 @@ static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
 			break;
 		}
 	}
+}*/
+static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
+{
+	int i, start_copy, copy_size, correct1;
+	int trimed;
+	struct smi2021_buf *buf = smi2021->cur_buf;
+
+//	int that_block_copyed;
+//	that_block_copyed = 0;
+	start_copy = 0;
+
+	if (smi2021->sync_state == HSYNC)
+		trimed = 0;
+	else
+		trimed = smi2021->sync_state;
+
+	for (i = 0; i < size; i++) {
+		switch (smi2021->sync_state) {
+		case HSYNC:
+			if (p[i] == 0xff)
+				smi2021->sync_state = SYNCZ1;
+			break;
+		case SYNCZ1:
+			if (p[i] == 0x00) {
+				smi2021->sync_state = SYNCZ2;
+			} else {
+				smi2021->sync_state = HSYNC;
+			}
+			break;
+		case SYNCZ2:
+			if (p[i] == 0x00) {
+				smi2021->sync_state = TRC;
+			} else {
+				smi2021->sync_state = HSYNC;
+			}
+			break;
+		case TRC:
+			smi2021->sync_state = HSYNC;
+			if ( i > 2 ) {
+				if ( trimed > 0 ) {
+					switch (trimed) {
+					case SYNCZ1:
+						copy_video_char(smi2021, 0xff);
+//						smi2021->trougth_trc_byte = smi2021->trougth_trc_byte + 1;
+					break;
+					case SYNCZ2:
+						copy_video_char(smi2021, 0xff);
+						copy_video_char(smi2021, 0x00);
+//						smi2021->trougth_trc_byte = smi2021->trougth_trc_byte + 2;
+					break;
+					}
+					trimed = 0;
+				}
+				copy_size = i - 3 - start_copy;
+				if ( copy_size > 0 ) {
+//					smi2021->trougth_trc_byte = smi2021->trougth_trc_byte + copy_size;
+//					dev_info(smi2021->dev, "Trougth TRC COPY = %d\n", smi2021->trougth_trc_byte);
+//					smi2021->trougth_trc_byte = 0;
+					copy_video_block(smi2021, &(p[start_copy]), copy_size);
+
+/*		if (smi2021->sekond_frame)
+			smi2021->sekond_frame = false;
+		else
+			smi2021->sekond_frame = true;
+*/
+					//that_block_copyed = that_block_copyed + copy_size;
+				}
+/*				if ( is_sav(p[i]) ) {
+					if (buf) {
+						//dev_info(smi2021->dev, "BUFF POS = %d\n", buf->pos);
+					//	if (buf->pos + 1440 >= buf->length) {
+							dev_info(smi2021->dev, "BUFF POS = %d\n", buf->pos);
+							smi2021_buf_done(smi2021);
+					//	}
+					} 
+					if (!buf) {
+						buf = smi2021_get_buf(smi2021);
+						if (buf) {
+							smi2021->cur_buf = buf;
+							smi2021->skip_frame = false;
+						}
+					}
+				}*/
+			}
+			start_copy = i + 1;
+
+//	if (buf) {
+//		smi2021->skip_frame = false;
+//	}
+			parse_trc(smi2021, p[i]);
+//			dev_info(smi2021->dev, "TRC = %x\n", p[i]);
+			break;
+		}
+	}
+	if ( start_copy < size ) {
+		switch (smi2021->sync_state) {
+			case HSYNC:
+				correct1 = 0;
+			break;
+			case SYNCZ1:
+				correct1 = 1;
+			break;
+			case SYNCZ2:
+				correct1 = 2;
+			break;
+		}
+		if ( trimed > 0 ) {
+			switch (trimed) {
+				case SYNCZ1:
+					copy_video_char(smi2021, 0xff);
+//						smi2021->trougth_trc_byte = smi2021->trougth_trc_byte + 1;
+				break;
+				case SYNCZ2:
+					copy_video_char(smi2021, 0xff);
+					copy_video_char(smi2021, 0x00);
+//						smi2021->trougth_trc_byte = smi2021->trougth_trc_byte + 2;
+				break;
+			}
+			trimed = 0;
+		}
+		copy_size = size - start_copy - correct1;
+		copy_video_block(smi2021, &(p[start_copy]), copy_size);
+//		smi2021->trougth_trc_byte = smi2021->trougth_trc_byte + copy_size;
+		//that_block_copyed = that_block_copyed + copy_size;
+	}
+	//dev_warn(smi2021->dev, "CopY summary %d\n", that_block_copyed);
 }
 
 /*
@@ -988,7 +1272,9 @@ static int smi2021_usb_probe(struct usb_interface *intf,
 	}
 
 	smi2021_initialize(smi2021);
-
+smi2021->skip_frame = false;
+smi2021->sekond_frame = false;
+smi2021->trougth_trc_byte = 0;
 	/* i2c adapter */
 	smi2021->i2c_adap = adap_template;
 

@@ -203,6 +203,10 @@ struct smi2021 {
 	int				cur_input;
 
 	int				iso_size;
+
+int trougth_trc_byte;
+bool skip_frame;
+bool sekond_frame;
 };
 
 /* Provided by smi2021_bootloader.c */
