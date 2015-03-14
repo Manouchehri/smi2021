@@ -204,6 +204,13 @@ static int queue_setup(struct vb2_queue *vq,
 
 	return 0;
 }
+static int buffer_prep (struct vb2_buffer *vb) {
+
+	//dev_info(smi2021->dev, "BUFFFFFFFF_PREPPP\n");
+	pr_err("BUFFFFFFFF_PREPPP\n");
+return 0;
+
+}
 
 static void buffer_queue(struct vb2_buffer *vb)
 {
@@ -225,7 +232,16 @@ static void buffer_queue(struct vb2_buffer *vb)
 
 		buf->trc_av = 0;
 		buf->in_blank = true;
+//		buf->in_blank = false;
 		buf->second_field = false;
+
+buf->c_sav = 0;
+buf->c_active = 0;
+buf->c_first = 0;
+buf->c_sec = 0;
+buf->c_blank = 0;
+buf->c_blank_std = 0;
+buf->c_unk = 0;
 
 		/*
 		 * If the buffer length is less than expected,
@@ -256,6 +272,7 @@ static struct vb2_ops smi2021_video_qops = {
 	.buf_queue		= buffer_queue,
 	.start_streaming	= start_streaming,
 	.stop_streaming		= stop_streaming,
+//.buf_prepare = buffer_prep,
 	.wait_prepare		= vb2_ops_wait_prepare,
 	.wait_finish		= vb2_ops_wait_finish,
 };
