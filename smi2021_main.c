@@ -1023,7 +1023,7 @@ static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
 							smi2021->skip_frame = false;
 						}
 					}*/
-			break;
+// Most case bug in bed some line here			break;
 		}
 	}
 	if ( start_copy < size ) {
