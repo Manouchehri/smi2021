@@ -320,9 +320,9 @@ static void smi2021_buf_done(struct smi2021 *smi2021)
 {
 	struct smi2021_buf *buf = smi2021->cur_buf;
 
-//	if (buf)
-//		dev_info(smi2021->dev, "BUF TOTAL: sav=%d, active=%d, first=%d, second=%d, blank=%d, blank_std=%d, unknown=%d\n", buf->c_sav, buf->c_active, buf->c_first, buf->c_sec, buf->c_blank, buf->c_blank_std, buf->c_unk);
-//	dev_info(smi2021->dev, "BUF TOSMI: sav=%d, active=%d, first=%d, second=%d, blank=%d, blank_std=%d, unknown=%d\n", smi2021->cb_sav, smi2021->cb_active, smi2021->cb_first, smi2021->cb_sec, smi2021->cb_blank, smi2021->cb_blank_std, smi2021->cb_unk);
+	if (buf)
+		dev_info(smi2021->dev, "BUF TOTAL: sav=%d, active=%d, first=%d, second=%d, blank=%d, blank_std=%d, unknown=%d\n", buf->c_sav, buf->c_active, buf->c_first, buf->c_sec, buf->c_blank, buf->c_blank_std, buf->c_unk);
+	dev_info(smi2021->dev, "BUF TOSMI: sav=%d, active=%d, first=%d, second=%d, blank=%d, blank_std=%d, unknown=%d\n", smi2021->cb_sav, smi2021->cb_active, smi2021->cb_first, smi2021->cb_sec, smi2021->cb_blank, smi2021->cb_blank_std, smi2021->cb_unk);
 smi2021->cb_sav = 0;
 smi2021->cb_active = 0;
 smi2021->cb_first = 0;
