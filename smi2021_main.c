@@ -600,184 +600,6 @@ buf_done:
 	smi2021->skip_frame_second_field = false;
 }
 
-static void parse_trc_new(struct smi2021 *smi2021, u8 trc)
-{
-	struct smi2021_buf *buf = smi2021->cur_buf;
-	//int lines_per_field = smi2021->cur_height / 2;
-	//int line = 0;
-
-	int field_edge;
-	int blank_edge;
-
-if (!buf) {
-	smi2021->cb_blank_std++;
-//	dev_info(smi2021->dev, "BUFF_STATUS:ERR\n");
-	return;
-} else {
-//	dev_info(smi2021->dev, "BUFF_STATUS:OK\n");
-}
-
-	if (trc == 0x00) {
-		dev_info(smi2021->dev, "active YUV data adsent\n");
-		return;
-	}
-
-	if (is_sav(trc)) {
-		smi2021->cb_sav++;
-
-		field_edge = buf->second_field;
-		blank_edge = buf->in_blank;
-
-		//buf->second_field = (trc & 0x40) ? 1 : 0;
-		//buf->in_blank = (trc & 0x20) ? 1 : 0;
-		buf->second_field = is_field2(trc);
-		buf->in_blank = is_active_video(trc);
-
-		field_edge = buf->second_field ^ field_edge;
-		blank_edge = buf->in_blank ^ blank_edge;
-
-if (is_field2(trc))
-	smi2021->cb_sec++;
-
-if (is_active_video(trc))
-	smi2021->cb_active++;
-
-		if (!buf->second_field && field_edge) {
-//			goto buf_done_new;
-		}
-		if (!buf->in_blank && blank_edge) {
-			buf->trc_av = 0;
-		}
-		if (buf->second_field && !is_field2(trc)) {
-//			dev_info(smi2021->dev, " NEVEEEEEEEEEERRRRRRRRRRRRRR\n");
-			goto buf_done_new;
-		}
-	} else {
-//		if (!buf->in_blank) {
-//		}
-	}
-buf_done_new:
-	smi2021_buf_done(smi2021);
-}
-/* static void copy_video(struct smi2021 *smi2021, u8 p)
-{
-	struct smi2021_buf *buf = smi2021->cur_buf;
-
-	int lines_per_field = smi2021->cur_height / 2;
-	int line = 0;
-	int pos_in_line = 0;
-	unsigned int offset = 0;
-	u8 *dst;
-
-	if (!buf)
-		return;
-
-	if (buf->in_blank)
-		return;
-
-	if (buf->pos >= buf->length) {
-		smi2021_buf_done(smi2021);
-		return;
-	}
-
-	pos_in_line = buf->pos % SMI2021_BYTES_PER_LINE;
-	line = buf->pos / SMI2021_BYTES_PER_LINE;
-	if (line >= lines_per_field)
-			line -= lines_per_field;
-
-	if (line != buf->trc_av - 1) {
-		// Keep video synchronized.
-		 // The device will sometimes give us too many bytes
-		 // for a line, before we get a new TRC.
-		 // We just drop these bytes //
-		return;
-	}
-
-	if (buf->second_field)
-		offset += SMI2021_BYTES_PER_LINE;
-
-	offset += (SMI2021_BYTES_PER_LINE * line * 2) + pos_in_line;
-
-	// Will this ever happen?
-	if (offset >= buf->length)
-		return;
-
-	dst = buf->mem + offset;
-	*dst = p;
-	buf->pos++;
-}*/
-
-static void copy_video_char(struct smi2021 *smi2021, u8 p)
-{
-	struct smi2021_buf *buf = smi2021->cur_buf;
-
-	int lines_per_field = smi2021->cur_height / 2;
-	int line = 0;
-	int pos_in_line = 0;
-	unsigned int offset = 0;
-	u8 *dst;
-
-if (smi2021->skip_frame)
-	return;
-
-	if (!buf) {
-//		dev_warn(smi2021->dev, "CHARR buf == NULL\n");
-//smi2021->skip_frame = true;
-		return;
-	}
-
-	if (buf->in_blank) {
-//		dev_warn(smi2021->dev, "CHARR buf->in_blank\n");
-		return;
-	}
-
-	if (buf->pos >= buf->length) {
-		dev_warn(smi2021->dev, "CHARR buf->pos %d >= buf->length %d\n", buf->pos, buf->length);
-		smi2021_buf_done(smi2021);
-		return;
-	}
-
-	pos_in_line = buf->pos % SMI2021_BYTES_PER_LINE;
-	line = buf->pos / SMI2021_BYTES_PER_LINE;
-/*	if (line >= lines_per_field) {
-			dev_warn(smi2021->dev, "CHARR line %d >= lines_per_field %d\n", line, lines_per_field);
-			line -= lines_per_field;
-	} */
-	if (buf->second_field) {
-		offset += SMI2021_BYTES_PER_LINE;
-		if (line >= lines_per_field) {
-			line -= lines_per_field;
-		} else {
-			dev_warn(smi2021->dev, "CHARR ERR second field, but line %d < lines_per_field %d\n", line, lines_per_field);
-		}
-	}
-
-/*	if (line != buf->trc_av - 1) {
-		// Keep video synchronized.
-		 // The device will sometimes give us too many bytes
-		 // for a line, before we get a new TRC.
-		 // We just drop these bytes
-			dev_warn(smi2021->dev, "CHARR TRC_AV\n");
-		return;
-	}*/
-
-//	if (smi2021->sekond_frame)
-/*	if (buf->second_field)
-		offset += SMI2021_BYTES_PER_LINE;*/
-
-	offset += (SMI2021_BYTES_PER_LINE * line * 2) + pos_in_line;
-
-	/* Will this ever happen? */
-	if (offset >= buf->length) {
-		dev_warn(smi2021->dev, "CHARR offset %d >= buf->length %d\n", offset, buf->length);
-		return;
-	}
-
-	dst = buf->mem + offset;
-	*dst = p;
-	buf->pos++;
-}
-
 static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
 {
 	struct smi2021_buf *buf = smi2021->cur_buf;
@@ -788,7 +610,7 @@ static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
 	unsigned int offset = 0;
 	u8 *dst;
 
-	int start_corr, end_copy, len_copy;
+	int start_corr, len_copy;
 	start_corr = 0;
 	len_copy = size;
 
@@ -916,31 +738,26 @@ if (smi2021->skip_frame)
 static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
 {
 	int i, start_copy, copy_size, correct1;
-	struct smi2021_buf *buf = smi2021->cur_buf;
 
 	static u8 trimed[2] = { 0xff, 0x00 };
 
 	correct1 = 0;
 	start_copy = 0;
 
-	switch (smi2021->sync_state) {
-	case SYNCZ1:
+	if ( smi2021->sync_state == SYNCZ1 ) {
 		if (p[0] == 0x00 && p[1] == 0x00) {
 			start_copy = 3;
 		} else {
 			copy_video_block(smi2021, &(trimed[0]), 1);
 			smi2021->sync_state = HSYNC;
 		}
-		break;
-	case SYNCZ2:
+	} else if ( smi2021->sync_state == SYNCZ2 ) {
 		if (p[0] == 0x00) {
 			start_copy = 2;
 		} else {
 			copy_video_block(smi2021, &(trimed[0]), 2);
 			smi2021->sync_state = HSYNC;
-			smi2021->sync_state = HSYNC;
 		}
-		break;
 	}
 
 	for (i = 0; i < size; i++) {
@@ -974,14 +791,10 @@ static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
 		}
 	}
 	if ( start_copy < size ) {
-		switch (smi2021->sync_state) {
-			case SYNCZ1:
-				correct1 = 1;
-			break;
-			case SYNCZ2:
-				correct1 = 2;
-			break;
-		}
+		if ( smi2021->sync_state == SYNCZ1 ) 
+			correct1 = 1;
+		else if ( smi2021->sync_state == SYNCZ2 )
+			correct1 = 2;
 		copy_size = size - start_copy - correct1;
 		copy_video_block(smi2021, &(p[start_copy]), copy_size);
 	}
