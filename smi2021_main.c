@@ -916,17 +916,32 @@ if (smi2021->skip_frame)
 static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
 {
 	int i, start_copy, copy_size, correct1;
-	int trimed;
 	struct smi2021_buf *buf = smi2021->cur_buf;
 
-//	int that_block_copyed;
-//	that_block_copyed = 0;
+	static u8 trimed[2] = { 0xff, 0x00 };
+
+	correct1 = 0;
 	start_copy = 0;
 
-	if (smi2021->sync_state == HSYNC)
-		trimed = 0;
-	else
-		trimed = smi2021->sync_state;
+	switch (smi2021->sync_state) {
+	case SYNCZ1:
+		if (p[0] == 0x00 && p[1] == 0x00) {
+			start_copy = 3;
+		} else {
+			copy_video_block(smi2021, &(trimed[0]), 1);
+			smi2021->sync_state = HSYNC;
+		}
+		break;
+	case SYNCZ2:
+		if (p[0] == 0x00) {
+			start_copy = 2;
+		} else {
+			copy_video_block(smi2021, &(trimed[0]), 2);
+			smi2021->sync_state = HSYNC;
+			smi2021->sync_state = HSYNC;
+		}
+		break;
+	}
 
 	for (i = 0; i < size; i++) {
 		switch (smi2021->sync_state) {
@@ -950,87 +965,16 @@ static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
 			break;
 		case TRC:
 			smi2021->sync_state = HSYNC;
-			if ( i > 2 ) {
-				if ( trimed > 0 ) {
-					switch (trimed) {
-					case SYNCZ1:
-						copy_video_char(smi2021, 0xff);
-//						smi2021->trougth_trc_byte = smi2021->trougth_trc_byte + 1;
-					break;
-					case SYNCZ2:
-						copy_video_char(smi2021, 0xff);
-						copy_video_char(smi2021, 0x00);
-//						smi2021->trougth_trc_byte = smi2021->trougth_trc_byte + 2;
-					break;
-					}
-					trimed = 0;
-				}
-				copy_size = i - 3 - start_copy;
-				if ( copy_size > 0 ) {
-//					smi2021->trougth_trc_byte = smi2021->trougth_trc_byte + copy_size;
-//					dev_info(smi2021->dev, "Trougth TRC COPY = %d\n", smi2021->trougth_trc_byte);
-//					smi2021->trougth_trc_byte = 0;
-					copy_video_block(smi2021, &(p[start_copy]), copy_size);
-					//that_block_copyed = that_block_copyed + copy_size;
-					/*buf = smi2021->cur_buf;
-					if (!buf) {
-						buf = smi2021_get_buf(smi2021);
-						if (buf) {
-							smi2021->cur_buf = buf;
-							smi2021->skip_frame = false;
-						}
-					}*/
-				}
-/*				if ( is_sav(p[i]) ) {
-					if (buf) {
-						//dev_info(smi2021->dev, "BUFF POS = %d\n", buf->pos);
-					//	if (buf->pos + 1440 >= buf->length) {
-							dev_info(smi2021->dev, "BUFF POS = %d\n", buf->pos);
-							smi2021_buf_done(smi2021);
-					//	}
-					} 
-					if (!buf) {
-						buf = smi2021_get_buf(smi2021);
-						if (buf) {
-							smi2021->cur_buf = buf;
-							smi2021->skip_frame = false;
-						}
-					}
-				}*/
+			copy_size = i - 3 - start_copy;
+			if ( copy_size > 0 ) {
+				copy_video_block(smi2021, &(p[start_copy]), copy_size);
 			}
 			start_copy = i + 1;
-
-//	if (buf) {
-//		smi2021->skip_frame = false;
-//	}
-/*					buf = smi2021->cur_buf;
-					if (!buf) {
-						buf = smi2021_get_buf(smi2021);
-						if (buf) {
-							smi2021->cur_buf = buf;
-							smi2021->skip_frame = false;
-						}
-					} */
-//		if (buf)
 			parse_trc(smi2021, p[i]);
-//			parse_trc_new(smi2021, p[i]);
-//			dev_info(smi2021->dev, "TRC = %x\n", p[i]);
-/*					buf = smi2021->cur_buf;
-					if (!buf) {
-						buf = smi2021_get_buf(smi2021);
-						if (buf) {
-							smi2021->cur_buf = buf;
-							smi2021->skip_frame = false;
-						}
-					}*/
-// Most case bug in bed some line here			break;
 		}
 	}
 	if ( start_copy < size ) {
 		switch (smi2021->sync_state) {
-			case HSYNC:
-				correct1 = 0;
-			break;
 			case SYNCZ1:
 				correct1 = 1;
 			break;
@@ -1038,26 +982,9 @@ static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
 				correct1 = 2;
 			break;
 		}
-		if ( trimed > 0 ) {
-			switch (trimed) {
-				case SYNCZ1:
-					copy_video_char(smi2021, 0xff);
-//						smi2021->trougth_trc_byte = smi2021->trougth_trc_byte + 1;
-				break;
-				case SYNCZ2:
-					copy_video_char(smi2021, 0xff);
-					copy_video_char(smi2021, 0x00);
-//						smi2021->trougth_trc_byte = smi2021->trougth_trc_byte + 2;
-				break;
-			}
-			trimed = 0;
-		}
 		copy_size = size - start_copy - correct1;
 		copy_video_block(smi2021, &(p[start_copy]), copy_size);
-//		smi2021->trougth_trc_byte = smi2021->trougth_trc_byte + copy_size;
-		//that_block_copyed = that_block_copyed + copy_size;
 	}
-	//dev_warn(smi2021->dev, "CopY summary %d\n", that_block_copyed);
 }
 
 /*
