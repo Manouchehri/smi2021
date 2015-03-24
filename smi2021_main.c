@@ -320,17 +320,6 @@ static void smi2021_buf_done(struct smi2021 *smi2021)
 {
 	struct smi2021_buf *buf = smi2021->cur_buf;
 
-//	if (buf)
-//		dev_info(smi2021->dev, "BUF TOTAL: sav=%d, active=%d, first=%d, second=%d, blank=%d, blank_std=%d, unknown=%d\n", buf->c_sav, buf->c_active, buf->c_first, buf->c_sec, buf->c_blank, buf->c_blank_std, buf->c_unk);
-//	dev_info(smi2021->dev, "BUF TOSMI: sav=%d, active=%d, first=%d, second=%d, blank=%d, blank_std=%d, unknown=%d\n", smi2021->cb_sav, smi2021->cb_active, smi2021->cb_first, smi2021->cb_sec, smi2021->cb_blank, smi2021->cb_blank_std, smi2021->cb_unk);
-smi2021->cb_sav = 0;
-smi2021->cb_active = 0;
-smi2021->cb_first = 0;
-smi2021->cb_sec = 0;
-smi2021->cb_blank = 0;
-smi2021->cb_blank_std = 0;
-smi2021->cb_unk = 0;
-
 	v4l2_get_timestamp(&buf->vb.v4l2_buf.timestamp);
 	buf->vb.v4l2_buf.sequence = smi2021->sequence++;
 	buf->vb.v4l2_buf.field = V4L2_FIELD_INTERLACED;
@@ -355,10 +344,6 @@ smi2021->cb_unk = 0;
 #define is_field1(trc)						\
 	((trc & SMI2021_TRC_FIELD_2) == 0x00)
 
-//#define SMI2021_TRC_EAV     0x10
-//#define SMI2021_TRC_VBI     0x20
-//#define SMI2021_TRC_FIELD_2 0x40
-//#define SMI2021_TRC     0x80
 /*
  * Parse the TRC.
  * Grab a new buffer from the queue if don't have one
@@ -366,76 +351,25 @@ smi2021->cb_unk = 0;
  *
  * Mark video buffers as done if we have one full frame.
  */
-
-
 static void parse_trc(struct smi2021 *smi2021, u8 trc)
 {
 	struct smi2021_buf *buf = smi2021->cur_buf;
 	int lines_per_field = smi2021->cur_height / 2;
 	int line = 0;
 	bool tmp_keep = false;
-bool NOT_MATCH = true;
-bool NOT_MATCH_G = true;
-	if (is_sav(trc)) {
-		smi2021->cb_sav++;
-		NOT_MATCH_G=false;
-	}
-	if (is_field2(trc)) {
-		smi2021->cb_sec++;
-		NOT_MATCH_G=false;
-	}
-	if (is_field1(trc)) {
-		smi2021->cb_first++;
-		NOT_MATCH_G=false;
-	}
-	if (is_active_video(trc)) {
-		smi2021->cb_active++;
-		NOT_MATCH_G=false;
-	}
-	if (NOT_MATCH_G) {
-		smi2021->cb_unk++;
-	} 
-
-/*	if (!buf) {
-		smi2021->c_skip_line_by_buf_adsent++;
-		return;
-	}
-
-	if (smi2021->c_skip_line_by_buf_adsent > 0) {
-		buf->c_blank_std = buf->c_blank_std + smi2021->c_skip_line_by_buf_adsent;
-		smi2021->c_skip_line_by_buf_adsent = 0;
-	}*/
-	
 
 	if (!buf) {
-		smi2021->c_skip_line_by_buf_adsent++;
-		smi2021->cb_blank_std++;
-
-//if (is_sav(trc) || is_active_video(trc) || is_field1(trc)) {
-// all good
-//} else {
-//		if (!is_sav(trc) && !is_active_video(trc)) {
-//			return;
-//		}
-
 		if (!is_sav(trc)) {
 			if (!smi2021->skip_frame) {
 				return;
 			}
-//			dev_info(smi2021->dev, "ERR_EXIT = NOT is_sav\n");
 		}
 
 		if (!is_active_video(trc)) {
-//			dev_info(smi2021->dev, "ERR_EXIT = NOT is_active_video\n");
 			if (!smi2021->skip_frame) {
 				return;
 			}
 		}
-//}
-
-
-//		if (is_field1(trc))
-//			return;
 
 		if (is_field2(trc)) {
 			if (!smi2021->skip_frame) {
@@ -443,15 +377,12 @@ bool NOT_MATCH_G = true;
 			}
 		}
 
-//return;
 		if (!smi2021->skip_frame) {
 			buf = smi2021_get_buf(smi2021);
 			if (!buf) {
-//				dev_info(smi2021->dev, "BUFF_MUST_SKIP\n");
 				smi2021->skip_frame = true;
 				return;
 			} else {
-//				dev_info(smi2021->dev, "BUFF GRANTED\n");
 				smi2021->skip_frame = false;
 			}
 		}
@@ -460,65 +391,7 @@ bool NOT_MATCH_G = true;
 		if (!smi2021->skip_frame) {
 			smi2021->cur_buf = buf;
 		}
-		smi2021->c_skip_line_by_buf_adsent--;
-		smi2021->cb_blank_std--;
-
-		if (smi2021->c_skip_line_by_buf_adsent > 0) {
-			if (!smi2021->skip_frame) {
-				buf->c_blank_std = buf->c_blank_std + smi2021->c_skip_line_by_buf_adsent;
-			}
-			smi2021->c_skip_line_by_buf_adsent = 0;
-		}
 	}
-
-/*
-if (buf->in_blank)
-	if (is_sav(trc))
-		buf->in_blank = false;
-if (buf->in_blank)
-	if (is_active_video(trc))
-		buf->in_blank = false;
-if (buf->in_blank)
-	if (is_field1(trc))
-		buf->in_blank = false;
-if (buf->in_blank)
-	if (is_field2(trc))
-		buf->in_blank = false;
-
-if (buf->in_blank)
-	return;
-	
-*/
-
-	if (is_sav(trc)) {
-		if (buf)
-			buf->c_sav++;
-		NOT_MATCH=false;
-//		dev_info(smi2021->dev, "Parse TRC = %x = is_sav\n", trc);
-	}
-	if (is_field2(trc)) {
-		if (buf)
-			buf->c_sec++;
-		NOT_MATCH=false;
-//		dev_info(smi2021->dev, "Parse TRC = %x = is_field2\n", trc);
-	}
-	if (is_field1(trc)) {
-		if (buf)
-			buf->c_first++;
-		NOT_MATCH=false;
-//		dev_info(smi2021->dev, "Parse TRC = %x = is_field1\n", trc);
-	}
-	if (is_active_video(trc)) {
-		if (buf)
-			buf->c_active++;
-		NOT_MATCH=false;
-//		dev_info(smi2021->dev, "Parse TRC = %x = is_active_video\n", trc);
-	}
-	if (NOT_MATCH) {
-		if (buf)
-			buf->c_unk++;
-//		dev_info(smi2021->dev, "Parse TRC = %x = NOT_MATCH\n", trc);
-	} 
 
 	if (is_sav(trc)) {
 		/* Start of VBI or ACTIVE VIDEO */
@@ -530,15 +403,7 @@ if (buf->in_blank)
 			/* VBI */
 			if (buf)
 				buf->in_blank = true;
-if (buf)
-	buf->c_blank++;
-smi2021->cb_blank++;
 		}
-		//if (!buf->second_field && is_field1(trc)) {
-//			dev_info(smi2021->dev, " BUF_FIRSSSSTTTTTT = %d\n", is_field1(trc));
-//			dev_info(smi2021->dev, " BUF_FIRSSSSTTTTTT_ACTIVE = %d\n", is_active_video(trc));
-
-		//} else 
 
 		if (smi2021->skip_frame) {
 			tmp_keep = smi2021->skip_frame_second_field;
@@ -547,30 +412,20 @@ smi2021->cb_blank++;
 				tmp_keep = buf->second_field;
 		}
 
-		//if (!buf->second_field && is_field2(trc)) {
 		if (!tmp_keep && is_field2(trc)) {
 			if (buf)
 				line = buf->pos / SMI2021_BYTES_PER_LINE;
-			//if (line < lines_per_field) {
 			if (line < lines_per_field) {
-//	dev_info(smi2021->dev, " BEEE_field2_222  = trc_av %d < lines_per_field.\n", buf->trc_av, lines_per_field);
-////	dev_info(smi2021->dev, " SKIPPEDDDD = line %d < lines_per_field. TRC_AV = %d\n", line, lines_per_field, buf->trc_av);
-////	dev_info(smi2021->dev, " SKIPPEDDDD = line %d < lines_per_field. TRC_AV = %d\n", line, lines_per_field, buf->trc_av);
 				if (!smi2021->skip_frame)
 					dev_info(smi2021->dev, " WRONG_FIRST_BUF - skip\n");
 				if (!smi2021->skip_frame)
 					goto buf_done;
 			}
 
-	//			dev_info(smi2021->dev, " BUF_ NOT SKIIIIPPPP = %d\n", is_field1(trc));
 			if (buf)
 				buf->second_field = true;
 			if (smi2021->skip_frame)	
 				smi2021->skip_frame_second_field = true;
-			//buf->trc_av = 0;
-//				goto buf_done;
-			
-			
 		}
 
 		if (smi2021->skip_frame)
@@ -579,16 +434,13 @@ smi2021->cb_blank++;
 			tmp_keep = buf->second_field;
 
 		if (tmp_keep && !is_field2(trc)) {
-//			dev_info(smi2021->dev, " NEVEEEEEEEEEERRRRRRRRRRRRRR\n");
 			goto buf_done;
 		}
 	} else {
 		/* End of VBI or ACTIVE VIDEO */
 		if (buf) {
 			buf->in_blank = true;
-buf->c_blank++;
 		}
-smi2021->cb_blank++;
 	}
 
 	return;
@@ -1290,16 +1142,7 @@ smi2021->skip_frame = false;
 smi2021->skip_frame_second_field = false;
 
 smi2021->sekond_frame = false;
-smi2021->trougth_trc_byte = 0;
-smi2021->c_skip_line_by_buf_adsent = 0;
 
-smi2021->cb_sav = 0;
-smi2021->cb_active = 0;
-smi2021->cb_first = 0;
-smi2021->cb_sec = 0;
-smi2021->cb_blank = 0;
-smi2021->cb_blank_std = 0;
-smi2021->cb_unk = 0;
 	/* i2c adapter */
 	smi2021->i2c_adap = adap_template;
 

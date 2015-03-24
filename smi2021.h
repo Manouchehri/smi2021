@@ -119,16 +119,6 @@ struct smi2021_buf {
 
 	/* ActiveVideo - Line counter */
 	u16				trc_av;
-
-
-int c_sav;
-int c_active;
-int c_first;
-int c_sec;
-int c_blank;
-int c_blank_std;
-int c_unk;
-
 };
 
 struct smi2021_vid_input {
@@ -214,19 +204,10 @@ struct smi2021 {
 
 	int				iso_size;
 
-int trougth_trc_byte;
 bool skip_frame;
 bool skip_frame_second_field;
 bool sekond_frame;
-int c_skip_line_by_buf_adsent;
 
-int cb_sav;
-int cb_active;
-int cb_first;
-int cb_sec;
-int cb_blank;
-int cb_blank_std;
-int cb_unk;
 };
 
 /* Provided by smi2021_bootloader.c */
