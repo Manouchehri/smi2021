@@ -470,13 +470,10 @@ if (smi2021->skip_frame)
 	return;
 
 	if (!buf) {
-//		dev_warn(smi2021->dev, "BLOCK buf == NULL\n");
-//smi2021->skip_frame = true;
 		return;
 	}
 
 	if (buf->in_blank) {
-//		dev_warn(smi2021->dev, "BLOCK buf->in_blank\n");
 		return;
 	}
 
@@ -496,41 +493,14 @@ if (smi2021->skip_frame)
 			dev_warn(smi2021->dev, "BLOCK ERR second field, but line %d < lines_per_field %d\n", line, lines_per_field);
 		}
 	}
-	/*if (line >= lines_per_field) {
-			dev_warn(smi2021->dev, "BLOCK line %d >= lines_per_field %d. IS_SECOND= %d\n", line, lines_per_field, buf->second_field);
-			line -= lines_per_field;
-	} else {
-		dev_warn(smi2021->dev, "BLOCK line %d < lines_per_field %d. IS_SECOND= %d\n", line, lines_per_field, buf->second_field);
-	}*/
-//	if (line != buf->trc_av - 1) {
-		/* Keep video synchronized.
-		 * The device will sometimes give us too many bytes
-		 * for a line, before we get a new TRC.
-		 * We just drop these bytes */
-//		return;
-//	}
 
-	//if (smi2021->sekond_frame)
-/*	if (buf->second_field)
-		offset += SMI2021_BYTES_PER_LINE;*/
 
 	offset += (SMI2021_BYTES_PER_LINE * line * 2) + pos_in_line;
 
-	/* Will this ever happen? */
-//	if (offset >= buf->length)
-//		return;
-
-/*	if (buf->pos >= buf->length) {
-		smi2021_buf_done(smi2021);
-		return;
-	} */
 	dst = buf->mem + offset;
 	if ( ( buf->pos + size ) > buf->length ) {
 		len_copy = buf->length - (buf->pos + size);
-// TODO : DEBUG that CROP
-//		dev_warn(smi2021->dev, "CROP copy_video_block %d\n", (buf->pos + size) - buf->length);
 	}
-	//*dst = p;
 	if ( len_copy > 0) {
 		memcpy(dst, p, len_copy );
 		buf->pos = buf->pos + len_copy;
@@ -549,44 +519,6 @@ if (smi2021->skip_frame)
  * EAV = End Active Video.
  * This is described in the saa7113 datasheet.
  */
-/*static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
-{
-	int i;
-
-	for (i = 0; i < size; i++) {
-		switch (smi2021->sync_state) {
-		case HSYNC:
-			if (p[i] == 0xff)
-				smi2021->sync_state = SYNCZ1;
-			else
-				copy_video(smi2021, p[i]);
-			break;
-		case SYNCZ1:
-			if (p[i] == 0x00) {
-				smi2021->sync_state = SYNCZ2;
-			} else {
-				smi2021->sync_state = HSYNC;
-				copy_video(smi2021, 0xff);
-				copy_video(smi2021, p[i]);
-			}
-			break;
-		case SYNCZ2:
-			if (p[i] == 0x00) {
-				smi2021->sync_state = TRC;
-			} else {
-				smi2021->sync_state = HSYNC;
-				copy_video(smi2021, 0xff);
-				copy_video(smi2021, 0x00);
-				copy_video(smi2021, p[i]);
-			}
-			break;
-		case TRC:
-			smi2021->sync_state = HSYNC;
-			parse_trc(smi2021, p[i]);
-			break;
-		}
-	}
-}*/
 static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
 {
 	int i, start_copy, copy_size, correct1;
@@ -1140,8 +1072,6 @@ static int smi2021_usb_probe(struct usb_interface *intf,
 	smi2021_initialize(smi2021);
 smi2021->skip_frame = false;
 smi2021->skip_frame_second_field = false;
-
-smi2021->sekond_frame = false;
 
 	/* i2c adapter */
 	smi2021->i2c_adap = adap_template;

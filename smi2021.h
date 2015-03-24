@@ -206,7 +206,6 @@ struct smi2021 {
 
 bool skip_frame;
 bool skip_frame_second_field;
-bool sekond_frame;
 
 };
 
