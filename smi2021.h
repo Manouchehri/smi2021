@@ -204,9 +204,12 @@ struct smi2021 {
 
 	int				iso_size;
 
-bool skip_frame;
-bool skip_frame_second_field;
+	bool skip_frame;
+	bool skip_frame_second_field;
 
+	int blk_line_start_recheck;
+	int blk_line_read;
+	int to_blk_line_end;
 };
 
 /* Provided by smi2021_bootloader.c */

@@ -545,6 +545,21 @@ static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
 	}
 
 	for (i = 0; i < size; i++) {
+		if ( smi2021->blk_line_read > 1 ) {
+			if ( smi2021->to_blk_line_end > ( size - i ) ) {
+				smi2021->to_blk_line_end = smi2021->to_blk_line_end - ( size - i );
+				copy_size = size - start_copy;
+			} else {
+				copy_size = smi2021->to_blk_line_end;
+				smi2021->to_blk_line_end = SMI2021_BYTES_PER_LINE;
+				smi2021->blk_line_read = 0;
+			}
+			copy_video_block(smi2021, &(p[start_copy]), copy_size);
+			i = i + copy_size;
+			start_copy = i + 1 + 3;
+			if (i>=size)
+				continue;
+		}
 		switch (smi2021->sync_state) {
 		case HSYNC:
 			if (p[i] == 0xff)
@@ -569,9 +584,11 @@ static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
 			copy_size = i - 3 - start_copy;
 			if ( copy_size > 0 ) {
 				copy_video_block(smi2021, &(p[start_copy]), copy_size);
+				smi2021->blk_line_read = 0;
 			}
 			start_copy = i + 1;
 			parse_trc(smi2021, p[i]);
+			smi2021->blk_line_read = smi2021->blk_line_read + 1;
 		}
 	}
 	if ( start_copy < size ) {
@@ -1070,8 +1087,12 @@ static int smi2021_usb_probe(struct usb_interface *intf,
 	}
 
 	smi2021_initialize(smi2021);
-smi2021->skip_frame = false;
-smi2021->skip_frame_second_field = false;
+	smi2021->skip_frame = false;
+	smi2021->skip_frame_second_field = false;
+
+	smi2021->blk_line_start_recheck = 0;
+	smi2021->blk_line_read = 0;
+	smi2021->to_blk_line_end = SMI2021_BYTES_PER_LINE;
 
 	/* i2c adapter */
 	smi2021->i2c_adap = adap_template;
