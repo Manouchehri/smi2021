@@ -6,7 +6,7 @@ The purpose of this repository is to merge and clean up several of the forks ava
 
 Ideally, grab it from your distro.
 
-Arch Linux - https://aur.archlinux.org/packages/somagic-easycap-smi2021/
+Arch Linux - https://aur.archlinux.org/packages/somagic-easycap-smi2021-git/
 
 If you've packaged it for another distro, please send me the link and I'll add it. Just make sure you've removed any smi2021\_\*.bin files, but still left instructions telling the user to get one.
 
