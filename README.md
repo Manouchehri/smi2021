@@ -1,47 +1,33 @@
 # smi2021
 
-Get base from https://github.com/jonjonarnearne/smi2021 (only /usr/src/linux/drivers/media/usb/smi2021)
+The purpose of this repository is to merge and clean up several of the forks available. A merge into the mainline kernel seems unlikely at the moment, as we don't have licensing on the binary blob that's needed to use the driver.
 
-Add some path from https://github.com/kerpz/smi2021 and https://github.com/barneyman/somagic - for compile
-And add some performance improve to parse_video
+## Installing
 
-From:
+Ideally, grab it from your distro.
+
+Arch Linux - https://aur.archlinux.org/packages/somagic-easycap-smi2021/
+
+If you've packaged it for another distro, please send me the link and I'll add it. Just make sure you've removed any smi2021\_\*.bin files, but still left instructions telling the user to get one.
+
+**Warning:** You will have to adjust the forth line depending on what distro you use. Put the module in whichever folder is appropriate.
 
 ```
-CPU: Core 2, speed 2.394e+06 MHz (estimated)
-Counted CPU_CLK_UNHALTED events (Clock cycles when not halted) with a unit mask of 0x00 (Unhalted core cycles) count 100000
+git clone git://github.com/Manouchehri/smi2021.git
+cd smi2021/
+make -C /lib/modules/$(uname -r)/build M=$PWD modules
+printf "I am not blindly copying these lines.\n"
+install -Dm644 smi2021.ko /usr/lib/modules/$(printf extramodules-`pacman -Q linux | grep -Po "\d+\.\d+"`-ARCH)/
 ```
-|samples | %       |    symbol name               |                   |samples | %        |              symbol name|
-|--------|---------|------------------------------|-------------------|--------|----------|-------------------------|
-|57171   | 98.5741 | smi2021_iso_cb               | smi2021.ko        |3       |   100.000| smi2021_iso_cb          |
-|57171   | 99.6010 | smi2021_iso_cb [self]        | smi2021.ko        |2714    |   82.2923| smi2021_iso_cb          |
-|161     |  0.2805 | smi2021_free_isoc            | smi2021.ko        |2714    |   82.1926| smi2021_iso_cb [self]   |
-|68      |  0.1185 | copy_video                   | smi2021.ko        |584     |   17.6863| copy_video_block        |
-|        |         |                              | smi2021.ko        |3       |    0.0909| smi2021_iso_cb          |
-|        |         |                              | smi2021.ko        |1       |    0.0303| smi2021_buf_done        |
-|--------|---------|------------------------------|-------------------|--------|----------|-------------------------|
-|161     | 35.3846 | smi2021_iso_cb               | smi2021.ko        |584     |   100.000| smi2021_iso_cb          |
-|294     | 64.6154 | smi2021_start                | smi2021.ko        |584     |   17.7077| copy_video_block        |
-|455     |  0.7845 | smi2021_free_isoc            | smi2021.ko        |584     |   100.000| copy_video_block [self] |
-|455     | 100.000 | smi2021_free_isoc [self]     |                   |        |          |                         |
-|--------|---------|------------------------------|-------------------|--------|----------|-------------------------|
-|68      | 38.6364 | smi2021_iso_cb               | smi2021.ko        |0       |         0| buffer_queue            |
-|108     | 61.3636 | smi2021_start                | videobuf2-core.ko |1       |   100.000| vb2_plane_vaddr         |
-|176     |  0.3035 | copy_video                   | smi2021.ko        |0       |         0| buffer_queue [self]     |
-|176     | 100.000 | copy_video [self]            |                   |        |          |                         |
-|--------|---------|------------------------------|-------------------|--------|----------|-------------------------|
-|118     |  0.2035 | smi2021_start                | smi2021.ko        |1       |   100.000| smi2021_iso_cb          |
-|294     | 56.5385 | smi2021_free_isoc            | smi2021.ko        |0       |         0| smi2021_buf_done        |
-|118     | 22.6923 | smi2021_start [self]         | videobuf2-core.ko |1       |   100.000| vb2_buffer_done         |
-|108     | 20.7692 | copy_video                   | smi2021.ko        |0       |         0| smi2021_buf_done [self] |
-|--------|---------|------------------------------|-------------------|--------|----------|-------------------------|
-|4       | 100.000 | smi2021_usb_disconnect       | smi2021.ko        |1       |   100.000| smi2021_buf_done        |
-|58      |  0.1000 | smi2021_usb_disconnect       | videobuf2-core.ko |0       |         0| vb2_buffer_done         |
-|58      | 93.5484 | smi2021_usb_disconnect [self]| videobuf2-core.ko |0       |         0| vb2_buffer_done [self]  |
-|4       |  6.4516 | smi2021_usb_disconnect       |                   |        |          |                         |
-|--------|---------|------------------------------|-------------------|--------|----------|-------------------------|
-|20      |  0.0345 | smi2021_toggle_audio         | smi2021.ko        |1       |   100.000| buffer_queue            |
-|20      | 100.000 | smi2021_toggle_audio [self]  | videobuf2-core.ko |0       |         0| vb2_plane_vaddr         |
-|        |         |                              | videobuf2-core.ko |0       |         0| vb2_plane_vaddr [self]  |
 
+After installing the module, you will have to copy `somagic_firmware.bin` (md5sum: `90f78491e831e8db44cfdd6204a2b602`) as `/usr/lib/firmware/smi2021_3c.bin`. Please do *not* share this file, as it's property of Somagic Inc. (Hang Zhou, China). If you Google the hash, you'll find guides that explain how to extract it.
 
+## Credits
+
+David Manouchehri - david@davidmanouchehri.com
+Jon Arne Jørgensen - jonjon.arnearne@gmail.com
+mastervolkov
+
+https://github.com/Manouchehri/smi2021
+https://github.com/jonjonarnearne/smi2021
+https://github.com/mastervolkov/smi2021
