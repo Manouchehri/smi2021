@@ -203,6 +203,9 @@ struct smi2021 {
 	int				cur_input;
 
 	int				iso_size;
+
+	bool 			skip_frame;
+	bool 			skip_frame_second_field;
 };
 
 /* Provided by smi2021_bootloader.c */

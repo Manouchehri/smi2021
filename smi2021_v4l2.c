@@ -78,7 +78,7 @@ static int vidioc_enum_fmt_vid_cap(struct file *file, void *priv,
 	if (f->index != 0)
 		return -EINVAL;
 
-	strlcpy(f->description, "16bpp YU2, 4:2:2, packed",
+	strlcpy(f->description, "16 bpp YUY2, 4:2:2, packed",
 					sizeof(f->description));
 	f->pixelformat = V4L2_PIX_FMT_UYVY;
 	return 0;

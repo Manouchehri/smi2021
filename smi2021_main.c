@@ -341,6 +341,9 @@ static void smi2021_buf_done(struct smi2021 *smi2021)
 	((trc & SMI2021_TRC_FIELD_2) == SMI2021_TRC_FIELD_2)
 #define is_active_video(trc)					\
 	((trc & SMI2021_TRC_VBI) == 0x00)
+#define is_field1(trc)						\
+	((trc & SMI2021_TRC_FIELD_2) == 0x00)
+
 /*
  * Parse the TRC.
  * Grab a new buffer from the queue if don't have one
@@ -353,57 +356,103 @@ static void parse_trc(struct smi2021 *smi2021, u8 trc)
 	struct smi2021_buf *buf = smi2021->cur_buf;
 	int lines_per_field = smi2021->cur_height / 2;
 	int line = 0;
+	bool tmp_keep = false;
 
 	if (!buf) {
-		if (!is_sav(trc))
-			return;
+		if (!is_sav(trc)) {
+			if (!smi2021->skip_frame) {
+				return;
+			}
+		}
 
-		if (!is_active_video(trc))
-			return;
+		if (!is_active_video(trc)) {
+			if (!smi2021->skip_frame) {
+				return;
+			}
+		}
 
-		if (is_field2(trc))
-			return;
+		if (is_field2(trc)) {
+			if (!smi2021->skip_frame) {
+				return;
+			}
+		}
 
-		buf = smi2021_get_buf(smi2021);
-		if (!buf)
-			return;
+		if (!smi2021->skip_frame) {
+			buf = smi2021_get_buf(smi2021);
+			if (!buf) {
+				smi2021->skip_frame = true;
+				return;
+			} else {
+				smi2021->skip_frame = false;
+			}
+		}
 
-		smi2021->cur_buf = buf;
+
+		if (!smi2021->skip_frame) {
+			smi2021->cur_buf = buf;
+		}
 	}
 
 	if (is_sav(trc)) {
 		/* Start of VBI or ACTIVE VIDEO */
 		if (is_active_video(trc)) {
-			buf->in_blank = false;
-			buf->trc_av++;
+			if (buf)
+				buf->in_blank = false;
+			//buf->trc_av++;
 		} else {
 			/* VBI */
-			buf->in_blank = true;
+			if (buf)
+				buf->in_blank = true;
 		}
 
-		if (!buf->second_field && is_field2(trc)) {
-			line = buf->pos / SMI2021_BYTES_PER_LINE;
-			if (line < lines_per_field)
-				goto buf_done;
-
-			buf->second_field = true;
-			buf->trc_av = 0;
+		if (smi2021->skip_frame) {
+			tmp_keep = smi2021->skip_frame_second_field;
+		} else {
+			if (buf)
+				tmp_keep = buf->second_field;
 		}
 
-		if (buf->second_field && !is_field2(trc))
+		if (!tmp_keep && is_field2(trc)) {
+			if (buf)
+				line = buf->pos / SMI2021_BYTES_PER_LINE;
+			if (line < lines_per_field) {
+				if (!smi2021->skip_frame)
+					dev_info(smi2021->dev, " WRONG_FIRST_BUF - skip\n");
+				if (!smi2021->skip_frame)
+					goto buf_done;
+			}
+
+			if (buf)
+				buf->second_field = true;
+			if (smi2021->skip_frame)	
+				smi2021->skip_frame_second_field = true;
+		}
+
+		if (smi2021->skip_frame)
+			tmp_keep = smi2021->skip_frame_second_field;
+		else
+			tmp_keep = buf->second_field;
+
+		if (tmp_keep && !is_field2(trc)) {
 			goto buf_done;
+		}
 	} else {
 		/* End of VBI or ACTIVE VIDEO */
-		buf->in_blank = true;
+		if (buf) {
+			buf->in_blank = true;
+		}
 	}
 
 	return;
 
 buf_done:
-	smi2021_buf_done(smi2021);
+	if (!smi2021->skip_frame)
+		smi2021_buf_done(smi2021);
+	smi2021->skip_frame = false;
+	smi2021->skip_frame_second_field = false;
 }
 
-static void copy_video(struct smi2021 *smi2021, u8 p)
+static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
 {
 	struct smi2021_buf *buf = smi2021->cur_buf;
 
@@ -413,42 +462,49 @@ static void copy_video(struct smi2021 *smi2021, u8 p)
 	unsigned int offset = 0;
 	u8 *dst;
 
-	if (!buf)
-		return;
+	int start_corr, len_copy;
+	start_corr = 0;
+	len_copy = size;
 
-	if (buf->in_blank)
+if (smi2021->skip_frame)
+	return;
+
+	if (!buf) {
 		return;
+	}
+
+	if (buf->in_blank) {
+		return;
+	}
 
 	if (buf->pos >= buf->length) {
+		dev_warn(smi2021->dev, "BLOCK buf->pos %d >= buf->length %d\n", buf->pos, buf->length);
 		smi2021_buf_done(smi2021);
 		return;
 	}
 
 	pos_in_line = buf->pos % SMI2021_BYTES_PER_LINE;
 	line = buf->pos / SMI2021_BYTES_PER_LINE;
-	if (line >= lines_per_field)
+	if (buf->second_field) {
+		offset += SMI2021_BYTES_PER_LINE;
+		if (line >= lines_per_field) {
 			line -= lines_per_field;
-
-	if (line != buf->trc_av - 1) {
-		/* Keep video synchronized.
-		 * The device will sometimes give us too many bytes
-		 * for a line, before we get a new TRC.
-		 * We just drop these bytes */
-		return;
+		} else {
+			dev_warn(smi2021->dev, "BLOCK ERR second field, but line %d < lines_per_field %d\n", line, lines_per_field);
+		}
 	}
 
-	if (buf->second_field)
-		offset += SMI2021_BYTES_PER_LINE;
 
 	offset += (SMI2021_BYTES_PER_LINE * line * 2) + pos_in_line;
 
-	/* Will this ever happen? */
-	if (offset >= buf->length)
-		return;
-
 	dst = buf->mem + offset;
-	*dst = p;
-	buf->pos++;
+	if ( ( buf->pos + size ) > buf->length ) {
+		len_copy = buf->length - (buf->pos + size);
+	}
+	if ( len_copy > 0) {
+		memcpy(dst, p, len_copy );
+		buf->pos = buf->pos + len_copy;
+	}
 }
 
 /*
@@ -465,23 +521,40 @@ static void copy_video(struct smi2021 *smi2021, u8 p)
  */
 static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
 {
-	int i;
+	int i, start_copy, copy_size, correct1;
+
+	static u8 trimed[2] = { 0xff, 0x00 };
+
+	correct1 = 0;
+	start_copy = 0;
+
+	if ( smi2021->sync_state == SYNCZ1 ) {
+		if (p[0] == 0x00 && p[1] == 0x00) {
+			start_copy = 3;
+		} else {
+			copy_video_block(smi2021, &(trimed[0]), 1);
+			smi2021->sync_state = HSYNC;
+		}
+	} else if ( smi2021->sync_state == SYNCZ2 ) {
+		if (p[0] == 0x00) {
+			start_copy = 2;
+		} else {
+			copy_video_block(smi2021, &(trimed[0]), 2);
+			smi2021->sync_state = HSYNC;
+		}
+	}
 
 	for (i = 0; i < size; i++) {
 		switch (smi2021->sync_state) {
 		case HSYNC:
 			if (p[i] == 0xff)
 				smi2021->sync_state = SYNCZ1;
-			else
-				copy_video(smi2021, p[i]);
 			break;
 		case SYNCZ1:
 			if (p[i] == 0x00) {
 				smi2021->sync_state = SYNCZ2;
 			} else {
 				smi2021->sync_state = HSYNC;
-				copy_video(smi2021, 0xff);
-				copy_video(smi2021, p[i]);
 			}
 			break;
 		case SYNCZ2:
@@ -489,16 +562,25 @@ static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
 				smi2021->sync_state = TRC;
 			} else {
 				smi2021->sync_state = HSYNC;
-				copy_video(smi2021, 0xff);
-				copy_video(smi2021, 0x00);
-				copy_video(smi2021, p[i]);
 			}
 			break;
 		case TRC:
 			smi2021->sync_state = HSYNC;
+			copy_size = i - 3 - start_copy;
+			if ( copy_size > 0 ) {
+				copy_video_block(smi2021, &(p[start_copy]), copy_size);
+			}
+			start_copy = i + 1;
 			parse_trc(smi2021, p[i]);
-			break;
 		}
+	}
+	if ( start_copy < size ) {
+		if ( smi2021->sync_state == SYNCZ1 ) 
+			correct1 = 1;
+		else if ( smi2021->sync_state == SYNCZ2 )
+			correct1 = 2;
+		copy_size = size - start_copy - correct1;
+		copy_video_block(smi2021, &(p[start_copy]), copy_size);
 	}
 }
 
@@ -762,6 +844,13 @@ int smi2021_start(struct smi2021 *smi2021)
 		goto start_fail;
 
 	smi2021_toggle_audio(smi2021, false);
+	// brightness default
+	smi2021_set_reg(smi2021, 0x4a, 0x0a, 0x80 );
+	// contrast default
+	smi2021_set_reg(smi2021, 0x4a, 0x0b, 0x47 );
+
+	// Output control 1
+	smi2021_set_reg(smi2021, 0x4a, 0x11, 0x0c );
 
 	if (!smi2021->isoc_ctl.num_bufs) {
 		rc = smi2021_alloc_isoc(smi2021);
@@ -980,6 +1069,10 @@ static int smi2021_usb_probe(struct usb_interface *intf,
 	}
 
 	smi2021_initialize(smi2021);
+	smi2021->skip_frame = false;
+	smi2021->sekond_frame = false;
+	smi2021->trougth_trc_byte = 0;
+	smi2021->skip_frame_second_field = false;
 
 	/* i2c adapter */
 	smi2021->i2c_adap = adap_template;
