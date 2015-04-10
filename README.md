@@ -25,9 +25,13 @@ After installing the module, you will have to copy `somagic_firmware.bin` (md5su
 ## Credits
 
 David Manouchehri - david@davidmanouchehri.com
+
 Jon Arne Jørgensen - jonjon.arnearne@gmail.com
-mastervolkov
+
+mastervolkov - mastervolkov@gmail.com
 
 https://github.com/Manouchehri/smi2021
+
 https://github.com/jonjonarnearne/smi2021
+
 https://github.com/mastervolkov/smi2021
