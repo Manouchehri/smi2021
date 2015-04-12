@@ -359,37 +359,19 @@ static void parse_trc(struct smi2021 *smi2021, u8 trc)
 	bool tmp_keep = false;
 
 	if (!buf) {
-		if (!is_sav(trc)) {
-			if (!smi2021->skip_frame) {
-				return;
-			}
-		}
-
-		if (!is_active_video(trc)) {
-			if (!smi2021->skip_frame) {
-				return;
-			}
-		}
-
-		if (is_field2(trc)) {
-			if (!smi2021->skip_frame) {
-				return;
-			}
-		}
-
 		if (!smi2021->skip_frame) {
-			buf = smi2021_get_buf(smi2021);
-			if (!buf) {
-				smi2021->skip_frame = true;
-				return;
+			// get_buf makes sense only in begin field1, otherwise frame will be incomplete and we skip it
+			if (is_sav(trc) && is_active_video(trc) && is_field1(trc)) {
+				buf = smi2021_get_buf(smi2021);
+				if (!buf) {
+					smi2021->skip_frame = true;
+					return;
+				} else {
+					smi2021->cur_buf = buf;
+				}
 			} else {
-				smi2021->skip_frame = false;
+				return;
 			}
-		}
-
-
-		if (!smi2021->skip_frame) {
-			smi2021->cur_buf = buf;
 		}
 	}
 
