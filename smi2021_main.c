@@ -356,7 +356,6 @@ static void parse_trc(struct smi2021 *smi2021, u8 trc)
 	struct smi2021_buf *buf = smi2021->cur_buf;
 	int lines_per_field = smi2021->cur_height / 2;
 	int line = 0;
-	bool tmp_keep = false;
 
 	if (!buf) {
 		if (!smi2021->skip_frame) {
@@ -377,46 +376,33 @@ static void parse_trc(struct smi2021 *smi2021, u8 trc)
 
 	if (is_sav(trc)) {
 		/* Start of VBI or ACTIVE VIDEO */
-		if (is_active_video(trc)) {
-			if (buf)
+		if (buf) {
+			if (is_active_video(trc)) {
 				buf->in_blank = false;
-			//buf->trc_av++;
-		} else {
-			/* VBI */
-			if (buf)
+			} else {
+				/* VBI */
 				buf->in_blank = true;
-		}
-
-		if (smi2021->skip_frame) {
-			tmp_keep = smi2021->skip_frame_second_field;
-		} else {
-			if (buf)
-				tmp_keep = buf->second_field;
-		}
-
-		if (!tmp_keep && is_field2(trc)) {
-			if (buf)
-				line = buf->pos / SMI2021_BYTES_PER_LINE;
-			if (line < lines_per_field) {
-				if (!smi2021->skip_frame)
-					dev_info(smi2021->dev, " WRONG_FIRST_BUF - skip\n");
-				if (!smi2021->skip_frame)
-					goto buf_done;
 			}
-
-			if (buf)
-				buf->second_field = true;
-			if (smi2021->skip_frame)	
-				smi2021->skip_frame_second_field = true;
 		}
-
-		if (smi2021->skip_frame)
-			tmp_keep = smi2021->skip_frame_second_field;
-		else
-			tmp_keep = buf->second_field;
-
-		if (tmp_keep && !is_field2(trc)) {
-			goto buf_done;
+		if (!smi2021->skip_frame) {
+			if (!buf->second_field && is_field2(trc)) {
+				line = buf->pos / SMI2021_BYTES_PER_LINE;
+				if (line < lines_per_field) {
+					dev_info(smi2021->dev, " WRONG_FIRST_BUF - skip\n");
+					goto buf_done;
+				}
+				buf->second_field = true;
+			}
+			if (buf->second_field && !is_field2(trc)) {
+				goto buf_done;
+			}
+		} else {
+			if (!smi2021->skip_frame_second_field && is_field2(trc)) {
+				smi2021->skip_frame_second_field = true;
+			}
+			if (smi2021->skip_frame_second_field && !is_field2(trc)) {
+				goto buf_done;
+			}
 		}
 	} else {
 		/* End of VBI or ACTIVE VIDEO */
