@@ -223,9 +223,8 @@ static void buffer_queue(struct vb2_buffer *vb)
 		buf->length = vb2_plane_size(vb, 0);
 		buf->pos = 0;
 
-		buf->trc_av = 0;
 		buf->in_blank = true;
-		buf->second_field = false;
+		buf->odd = false;
 
 		/*
 		 * If the buffer length is less than expected,

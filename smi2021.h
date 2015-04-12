@@ -112,13 +112,9 @@ struct smi2021_buf {
 	void				*mem;
 	unsigned int			length;
 
-	bool				active;
-	bool				second_field;
+	bool				odd;
 	bool				in_blank;
 	unsigned int			pos;
-
-	/* ActiveVideo - Line counter */
-	u16				trc_av;
 };
 
 struct smi2021_vid_input {
@@ -205,7 +201,7 @@ struct smi2021 {
 	int				iso_size;
 
 	bool skip_frame;
-	bool skip_frame_second_field;
+	bool skip_frame_odd;
 
 	int blk_line_start_recheck;
 	int blk_line_read;

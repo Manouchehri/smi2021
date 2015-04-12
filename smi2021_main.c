@@ -385,22 +385,22 @@ static void parse_trc(struct smi2021 *smi2021, u8 trc)
 			}
 		}
 		if (!smi2021->skip_frame) {
-			if (!buf->second_field && is_field2(trc)) {
+			if (!buf->odd && is_field2(trc)) {
 				line = buf->pos / SMI2021_BYTES_PER_LINE;
 				if (line < lines_per_field) {
 					dev_info(smi2021->dev, " WRONG_FIRST_BUF - skip\n");
 					goto buf_done;
 				}
-				buf->second_field = true;
+				buf->odd = true;
 			}
-			if (buf->second_field && !is_field2(trc)) {
+			if (buf->odd && !is_field2(trc)) {
 				goto buf_done;
 			}
 		} else {
-			if (!smi2021->skip_frame_second_field && is_field2(trc)) {
-				smi2021->skip_frame_second_field = true;
+			if (!smi2021->skip_frame_odd && is_field2(trc)) {
+				smi2021->skip_frame_odd = true;
 			}
-			if (smi2021->skip_frame_second_field && !is_field2(trc)) {
+			if (smi2021->skip_frame_odd && !is_field2(trc)) {
 				goto buf_done;
 			}
 		}
@@ -417,7 +417,7 @@ buf_done:
 	if (!smi2021->skip_frame)
 		smi2021_buf_done(smi2021);
 	smi2021->skip_frame = false;
-	smi2021->skip_frame_second_field = false;
+	smi2021->skip_frame_odd = false;
 }
 
 static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
@@ -453,7 +453,7 @@ if (smi2021->skip_frame)
 
 	pos_in_line = buf->pos % SMI2021_BYTES_PER_LINE;
 	line = buf->pos / SMI2021_BYTES_PER_LINE;
-	if (buf->second_field) {
+	if (buf->odd) {
 		offset += SMI2021_BYTES_PER_LINE;
 		if (line >= lines_per_field) {
 			line -= lines_per_field;
@@ -1056,7 +1056,7 @@ static int smi2021_usb_probe(struct usb_interface *intf,
 
 	smi2021_initialize(smi2021);
 	smi2021->skip_frame = false;
-	smi2021->skip_frame_second_field = false;
+	smi2021->skip_frame_odd = false;
 
 	smi2021->blk_line_start_recheck = 0;
 	smi2021->blk_line_read = 0;
