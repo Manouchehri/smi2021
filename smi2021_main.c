@@ -470,7 +470,9 @@ if (smi2021->skip_frame)
 		len_copy = buf->length - (buf->pos + size);
 	}
 	if ( len_copy > 0) {
-		memcpy(dst, p, len_copy );
+		if (copy_to_user(dst, p, len_copy )) {
+			dev_warn(smi2021->dev, " Failed copy to user buff: len_copy=%d, line=%d, odd=%d, buf->pos=%d, new buf->pos=%d\n", len_copy, line, buf->odd, buf->pos, buf->pos + len_copy);
+		}
 		buf->pos = buf->pos + len_copy;
 	}
 }
@@ -714,6 +716,7 @@ static int smi2021_alloc_isoc(struct smi2021 *smi2021)
 	sb_size = max_packets * smi2021->iso_size;
 
 	smi2021->cur_buf = NULL;
+	smi2021->sync_state = HSYNC;
 	smi2021->isoc_ctl.max_pkt_size = smi2021->iso_size;
 	smi2021->isoc_ctl.urb = kzalloc(sizeof(void *)*num_bufs, GFP_KERNEL);
 	if (!smi2021->isoc_ctl.urb) {
