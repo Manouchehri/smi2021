@@ -1,6 +1,6 @@
 # smi2021
 
-The purpose of this repository is to merge and clean up several of the forks available. A merge into the mainline kernel seems unlikely at the moment, as we don't have licensing on the binary blob that's needed to use the driver.
+The purpose of this repository is to merge and clean up several of the forks available. A merge into the mainline kernel seems possible; the binary blob is under the GPL, but we don't have the source.
 
 ## Installing
 
@@ -8,7 +8,7 @@ Ideally, grab it from your distro.
 
 - Arch Linux - https://aur.archlinux.org/packages/somagic-easycap-smi2021-git/
 
-If you've packaged it for another distro, please send me the link and I'll add it. Just make sure you've removed any `smi2021_*.bin` files, but still left instructions telling the user to get one.
+If you've packaged it for another distro, please send me the link and I'll add it. 
 
 **Warning:** You will have to adjust the fifth line depending on what distro you use. Put the module in whichever folder is appropriate.
 
@@ -45,7 +45,7 @@ Module compile:
 ```
 
 
-After installing the module, you will have to copy `somagic_firmware.bin` (md5sum: `90f78491e831e8db44cfdd6204a2b602`) as `/usr/lib/firmware/smi2021_3c.bin`. Please do *not* share this file, as it's property of Somagic Inc. (Hang Zhou, China). If you Google the hash, you'll find guides that explain how to extract it.
+After installing the module, you will have to copy `somagic_firmware.bin` (md5sum: `90f78491e831e8db44cfdd6204a2b602`) as `/usr/lib/firmware/smi2021_3c.bin`.
 
 ## Credits
 
