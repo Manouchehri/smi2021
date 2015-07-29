@@ -30,6 +30,13 @@
 
 #include "smi2021.h"
 
+#ifndef CONFIG_VIDEOBUF2_VMALLOC
+	#error  Unable find required dependency: CONFIG_VIDEOBUF2_VMALLOC in you kernel .config
+#endif
+#ifndef CONFIG_VIDEO_SAA711X
+	#error  Unable find required dependency: CONFIG_VIDEO_SAA711X in you kernel .config
+#endif
+
 #define VENDOR_ID 0x1c88
 #define BOOTLOADER_ID 0x0007
 
