@@ -2,6 +2,10 @@
 
 The purpose of this repository is to merge and clean up several of the forks available.
 
+## Minimal requirement
+
+- Kernel version must be greater than or equal to 3.12
+
 ## Installing
 
 ### From you distro.
