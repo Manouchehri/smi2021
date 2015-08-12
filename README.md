@@ -65,6 +65,13 @@ You can build that module one of the two options: as `internal` or as `external`
 
 After installing the module, you will have to copy `firmware/smi2021_3c.bin` (md5sum: `90f78491e831e8db44cfdd6204a2b602`) as `/usr/lib/firmware/smi2021_3c.bin`. If you Google the hash, you'll find guides that explain how to extract it.
 
+#### Verify installation
+
+- you can check, what `saa7115` module proper init you device (need once on first install, or new linux distrib, or with new smi2021 device(for proper check what they detected correct)). 
+For that check, you need 
+    - load saa7115 modules with debug: ```modprobe -r saa7115; modprobe saa7115 debug=1```
+    - load smi2021 and check dmesg: must be string like: ```saa7115 8-004a: gm7113c found @ 0x94 (smi2021)```
+
 ## Credits
 
 David Manouchehri - david@davidmanouchehri.com
