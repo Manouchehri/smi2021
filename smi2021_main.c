@@ -30,10 +30,10 @@
 
 #include "smi2021.h"
 
-#ifndef CONFIG_VIDEOBUF2_VMALLOC
+#if !defined(CONFIG_VIDEOBUF2_VMALLOC) && !defined(CONFIG_VIDEOBUF2_VMALLOC_MODULE)
 	#error  Unable find required dependency: CONFIG_VIDEOBUF2_VMALLOC in you kernel .config
 #endif
-#ifndef CONFIG_VIDEO_SAA711X
+#if !defined(CONFIG_VIDEO_SAA711X) && !defined(CONFIG_VIDEO_SAA711X_MODULE)
 	#error  Unable find required dependency: CONFIG_VIDEO_SAA711X in you kernel .config
 #endif
 
