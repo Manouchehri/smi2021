@@ -72,6 +72,11 @@ For that check, you need
     - load saa7115 modules with debug: ```modprobe -r saa7115; modprobe saa7115 debug=1```
     - load smi2021 and check dmesg: must be string like: ```saa7115 8-004a: gm7113c found @ 0x94 (smi2021)```
 
+## Module parameters
+
+- forceasgm - default 0. If set to 1 chipset version be showed as 10 - supported now version in saa7115 modules for detect current chip as gm7113c.
+In kernel command line it look like smi2021.forceasgm=1. In build as internal module we can set VIDEO\_SMI2021\_INIT\_AS\_GM7113C, but that not recommended, as module parameter present.
+
 ## Credits
 
 David Manouchehri - david@davidmanouchehri.com

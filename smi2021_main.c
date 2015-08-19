@@ -45,6 +45,17 @@
 #define SMI2021_MODE_STANDBY		0x03
 #define SMI2021_REG_CTRL_HEAD		0x0b
 
+#ifndef VIDEO_SMI2021_INIT_AS_GM7113C
+static short int forceasgm = 0;
+module_param(forceasgm, short, S_IRUGO );
+MODULE_PARM_DESC(forceasgm, "On 1 override gm7113 chip version to 10. Default 0");
+#else
+static short int forceasgm = 1;
+module_param(forceasgm, short, S_IRUGO );
+MODULE_PARM_DESC(forceasgm, "Not used. Compile time set to always return gm7113 chip version as 10.");
+#endif
+static short int ver_chip_orig_get = 0;
+
 static int smi2021_set_mode(struct smi2021 *smi2021, u8 mode)
 {
 	int pipe, rc;
@@ -228,7 +239,11 @@ static int smi2021_get_reg(struct smi2021 *smi2021, u8 i2c_addr,
 	if (rc < 0)
 		goto free_out;
 
-	*val = transfer_buf->data.val;
+	if (forceasgm && i2c_addr == 0x4a && reg == 0x00 && transfer_buf->data.val != 0x10 && ver_chip_orig_get) {
+		*val = 0x10;
+	} else {
+		*val = transfer_buf->data.val;
+	}
 
 free_out:
 	kfree(transfer_buf);
@@ -838,14 +853,6 @@ int smi2021_start(struct smi2021 *smi2021)
 	if (rc < 0)
 		goto start_fail;
 
-	// brightness default
-	smi2021_set_reg(smi2021, 0x4a, 0x0a, 0x80 );
-	// contrast default
-	smi2021_set_reg(smi2021, 0x4a, 0x0b, 0x47 );
-
-	// Output control 1
-	smi2021_set_reg(smi2021, 0x4a, 0x11, 0x0c );
-
 	smi2021_toggle_audio(smi2021, false);
 
 	if (!smi2021->isoc_ctl.num_bufs) {
@@ -1001,6 +1008,7 @@ static int smi2021_usb_probe(struct usb_interface *intf,
 	struct device *dev = &intf->dev;
 	struct usb_device *udev = interface_to_usbdev(intf);
 	struct smi2021 *smi2021;
+	u8 ver_chip;
 
 	if (udev->descriptor.idProduct == BOOTLOADER_ID)
 		return smi2021_bootloader_probe(intf, devid);
@@ -1063,6 +1071,23 @@ static int smi2021_usb_probe(struct usb_interface *intf,
 		dev_warn(dev, "Could not register v4l2 device\n");
 		goto free_ctrl;
 	}
+
+	smi2021_get_reg(smi2021, 0x4a, 0x00, &ver_chip);
+	ver_chip_orig_get = 1;
+
+#ifndef VIDEO_SMI2021_INIT_AS_GM7113C
+	if (ver_chip != 0x10) {
+		if (forceasgm) {
+			dev_warn(dev, "Not supported chip version %x overrided by 10\n", ver_chip);
+		} else {
+			dev_warn(dev, "WARNING !!! Your version=%x of chip may NOT be SUPPORTED in saa7115 module !!! Please make sure that the chip is initialized as gm7113c in saa7115 module (To see this, you may need load the saa7115 module with option debug=1)", ver_chip);
+		}
+	}
+#else
+	if (ver_chip != 0x10) {
+		dev_warn(dev, "Not supported chip version %x overrided statically by 10 in build time.", ver_chip);
+	}
+#endif
 
 	smi2021_initialize(smi2021);
 	smi2021->skip_frame = false;

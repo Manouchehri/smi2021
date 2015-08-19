@@ -9,3 +9,15 @@ config VIDEO_SMI2021
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called smi2021
+
+config VIDEO_SMI2021_INIT_AS_GM7113C
+	bool "Force SMI2021 init as gm7113c"
+	default n
+	depends on VIDEO_SMI2021
+	---help---
+	  This option override chip version in smi2021 device to 10 as supported 
+	  now version gm7113c in saa7115 module.
+	  Do not need to set this option as you can always use forceasgm=1 module 
+	  option.
+	  
+	  If you are not sure, say N here.
