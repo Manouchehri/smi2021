@@ -56,6 +56,10 @@ MODULE_PARM_DESC(forceasgm, "Not used. Compile time set to always return gm7113 
 #endif
 static short int ver_chip_orig_get = 0;
 
+static short int monochrome = 0;
+module_param(monochrome, short, S_IRUGO );
+MODULE_PARM_DESC(monochrome, "On init set monochrome output in chip. Default 0");
+
 static int smi2021_set_mode(struct smi2021 *smi2021, u8 mode)
 {
 	int pipe, rc;
@@ -852,6 +856,10 @@ int smi2021_start(struct smi2021 *smi2021)
 	rc = usb_set_interface(smi2021->udev, 0, 2);
 	if (rc < 0)
 		goto start_fail;
+
+	if (monochrome) {
+		smi2021_set_reg(smi2021, 0x4a, 0x11, 0x0d );
+	}
 
 	smi2021_toggle_audio(smi2021, false);
 
