@@ -154,61 +154,6 @@ struct smi2021_reg_ctrl_transfer {
 	} __packed data;
 } __packed;
 
-static int smi2021_set_reg(struct smi2021 *smi2021, u8 i2c_addr,
-			   u16 reg, u8 val)
-{
-	struct smi2021_reg_ctrl_transfer *transfer_buf;
-	int rc, pipe;
-
-	static const struct smi2021_reg_ctrl_transfer smi_data = {
-		.head = SMI2021_REG_CTRL_HEAD,
-		.i2c_addr = 0x00,
-		.data_cntl = 0x00,
-		.data_offset = 0x82,
-		.data_size = sizeof(u8),
-	};
-
-	static const struct smi2021_reg_ctrl_transfer i2c_data = {
-		.head = SMI2021_REG_CTRL_HEAD,
-		.i2c_addr = 0x00,
-		.data_cntl = 0xc0,
-		.data_offset = 0x01,
-		.data_size = sizeof(u8)
-	};
-
-	if (!smi2021->udev) {
-		rc = -ENODEV;
-		goto out;
-	}
-
-	transfer_buf = kzalloc(sizeof(*transfer_buf), GFP_KERNEL);
-	if (!transfer_buf) {
-		rc = -ENOMEM;
-		goto out;
-	}
-
-	if (i2c_addr) {
-		memcpy(transfer_buf, &i2c_data, sizeof(*transfer_buf));
-		transfer_buf->i2c_addr = i2c_addr;
-		transfer_buf->data.i2c_data.reg = reg;
-		transfer_buf->data.i2c_data.val = val;
-	} else {
-		memcpy(transfer_buf, &smi_data, sizeof(*transfer_buf));
-		transfer_buf->data.smi_data.reg = cpu_to_be16(reg);
-		transfer_buf->data.smi_data.val = val;
-	}
-
-	pipe = usb_sndctrlpipe(smi2021->udev, SMI2021_USB_SNDPIPE);
-	rc = usb_control_msg(smi2021->udev, pipe, SMI2021_USB_REQUEST,
-			USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-			transfer_buf->head, SMI2021_USB_INDEX,
-			transfer_buf, sizeof(*transfer_buf), HZ);
-
-	kfree(transfer_buf);
-out:
-	return rc;
-}
-
 static int smi2021_get_reg(struct smi2021 *smi2021, u8 i2c_addr,
 			   u16 reg, u8 *val)
 {
@@ -286,6 +231,72 @@ static int smi2021_get_reg(struct smi2021 *smi2021, u8 i2c_addr,
 	} 
 
 free_out:
+	kfree(transfer_buf);
+out:
+	return rc;
+}
+
+static int smi2021_set_reg(struct smi2021 *smi2021, u8 i2c_addr,
+			   u16 reg, u8 val)
+{
+	struct smi2021_reg_ctrl_transfer *transfer_buf;
+	int rc, pipe;
+	u8 check_read;
+
+	static const struct smi2021_reg_ctrl_transfer smi_data = {
+		.head = SMI2021_REG_CTRL_HEAD,
+		.i2c_addr = 0x00,
+		.data_cntl = 0x00,
+		.data_offset = 0x82,
+		.data_size = sizeof(u8),
+	};
+
+	static const struct smi2021_reg_ctrl_transfer i2c_data = {
+		.head = SMI2021_REG_CTRL_HEAD,
+		.i2c_addr = 0x00,
+		.data_cntl = 0xc0,
+		.data_offset = 0x01,
+		.data_size = sizeof(u8)
+	};
+
+	if (!smi2021->udev) {
+		rc = -ENODEV;
+		goto out;
+	}
+
+	transfer_buf = kzalloc(sizeof(*transfer_buf), GFP_KERNEL);
+	if (!transfer_buf) {
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	if (i2c_addr) {
+		memcpy(transfer_buf, &i2c_data, sizeof(*transfer_buf));
+		transfer_buf->i2c_addr = i2c_addr;
+		transfer_buf->data.i2c_data.reg = reg;
+		transfer_buf->data.i2c_data.val = val;
+	} else {
+		memcpy(transfer_buf, &smi_data, sizeof(*transfer_buf));
+		transfer_buf->data.smi_data.reg = cpu_to_be16(reg);
+		transfer_buf->data.smi_data.val = val;
+	}
+
+	pipe = usb_sndctrlpipe(smi2021->udev, SMI2021_USB_SNDPIPE);
+	rc = usb_control_msg(smi2021->udev, pipe, SMI2021_USB_REQUEST,
+			USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+			transfer_buf->head, SMI2021_USB_INDEX,
+			transfer_buf, sizeof(*transfer_buf), 1000);
+	if ( i2c_addr == 0x4a && reg == 0x00 ) {
+		smi2021_get_reg(smi2021, i2c_addr, reg, &check_read);
+		if ( check_read == 0x00) {
+			dev_warn(smi2021->dev, "WARNING !!! Issue #15. Response to chip version request contains an error and request automatic once restarted.");
+			rc = usb_control_msg(smi2021->udev, pipe, SMI2021_USB_REQUEST,
+					USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+					transfer_buf->head, SMI2021_USB_INDEX,
+					transfer_buf, sizeof(*transfer_buf), 1000);
+		}
+	}
+
 	kfree(transfer_buf);
 out:
 	return rc;
