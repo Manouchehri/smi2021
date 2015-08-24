@@ -74,9 +74,12 @@ For that check, you need
 
 ## Module parameters
 
-- forceasgm - default 0. If set to 1 chipset version be showed as 10 - supported now version in saa7115 modules for detect current chip as gm7113c.
+- forceasgm - default 0. If set to 1 chipset version be set as gm7113C - supported now version in saa7115 modules.
 In kernel command line it look like smi2021.forceasgm=1. In build as internal module we can set VIDEO\_SMI2021\_INIT\_AS\_GM7113C, but that not recommended, as module parameter present.
 - monochrome - default 0. If set to 1 on init output be in monochrome mode only.
+- chiptype - default 0. You can skip autodetection and set chip version directly: 1 = gm7113C, 2 = saa7113.
+    - NOTICE: if you set 1 (gm7113C) - saa7115 module can incorrectly detect you chip, because now present some change in registry out and that part in under development. For module work as before - **NEED** use `forceasgm=1`
+    - NOTICE: chiptype **NOT** override version for other kernel module. For module work as before - **NEED** use `forceasgm=1`
 
 ## Credits
 

@@ -129,6 +129,18 @@ enum smi2021_sync {
 	TRC
 };
 
+/* Chip version */
+enum { 
+	GM7113C,
+	SAA7113,
+};
+
+struct smi2021_chip_type_data_st {
+	const int model_id;
+	const char *model_string;
+	const char *model_identifier;
+};
+
 struct gm7113c_init_overrides {
 	enum saa7113_r10_ofts		r10_ofts;
 	bool 				r10_vrln;
@@ -158,6 +170,8 @@ struct smi2021 {
 	struct v4l2_ctrl_handler	ctrl_handler;
 
 	/* i2c subdevice setup */
+	struct i2c_board_info		saa7113_info;
+	struct saa7115_platform_data	saa7113_platform_data;
 	struct i2c_board_info		gm7113c_info;
 	struct gm7113c_init_overrides	gm7113c_overrides;
 	struct saa7115_platform_data	gm7113c_platform_data;
@@ -206,6 +220,8 @@ struct smi2021 {
 	int blk_line_start_recheck;
 	int blk_line_read;
 	int to_blk_line_end;
+
+	struct smi2021_chip_type_data_st *chip_type_data;
 };
 
 /* Provided by smi2021_bootloader.c */

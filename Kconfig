@@ -21,3 +21,21 @@ config VIDEO_SMI2021_INIT_AS_GM7113C
 	  option.
 	  
 	  If you are not sure, say N here.
+
+choice
+	prompt "Type board decoder chip"
+	default VIDEO_SMI2021_CHIP_AUTODETECT
+	  depends on VIDEO_SMI2021 && !VIDEO_SMI2021_INIT_AS_GM7113C
+	help
+	  This option override chip version in smi2021 device.
+	  Do not need to set this option as you can always use chiptype in nodule option.
+	  
+	  If you are not sure, leave Auto here.
+	config VIDEO_SMI2021_CHIP_AUTODETECT
+	  bool "Auto"
+	config VIDEO_SMI2021_CHIP_GM7113C
+	  bool "gm7113C"
+	config VIDEO_SMI2021_CHIP_SAA7113
+	  bool "saa7113"
+endchoice
+
