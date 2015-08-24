@@ -84,7 +84,7 @@ static int smi2021_set_mode(struct smi2021 *smi2021, u8 mode)
 	rc = usb_control_msg(smi2021->udev, pipe, SMI2021_USB_REQUEST,
 			USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 			transfer_buf->head, SMI2021_USB_INDEX,
-			transfer_buf, sizeof(*transfer_buf), 1000);
+			transfer_buf, sizeof(*transfer_buf), HZ);
 
 out:
 	kfree(transfer_buf);
@@ -166,7 +166,7 @@ static int smi2021_set_reg(struct smi2021 *smi2021, u8 i2c_addr,
 	rc = usb_control_msg(smi2021->udev, pipe, SMI2021_USB_REQUEST,
 			USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 			transfer_buf->head, SMI2021_USB_INDEX,
-			transfer_buf, sizeof(*transfer_buf), 1000);
+			transfer_buf, sizeof(*transfer_buf), HZ);
 
 	kfree(transfer_buf);
 out:
@@ -218,7 +218,7 @@ static int smi2021_get_reg(struct smi2021 *smi2021, u8 i2c_addr,
 		rc = usb_control_msg(smi2021->udev, pipe, SMI2021_USB_REQUEST,
 			USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 			transfer_buf->head, SMI2021_USB_INDEX,
-			transfer_buf, sizeof(*transfer_buf), 1000);
+			transfer_buf, sizeof(*transfer_buf), HZ);
 		if (rc < 0)
 			goto free_out;
 
@@ -231,7 +231,7 @@ static int smi2021_get_reg(struct smi2021 *smi2021, u8 i2c_addr,
 	rc = usb_control_msg(smi2021->udev, pipe, SMI2021_USB_REQUEST,
 			USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 			transfer_buf->head, SMI2021_USB_INDEX,
-			transfer_buf, sizeof(*transfer_buf), 1000);
+			transfer_buf, sizeof(*transfer_buf), HZ);
 	if (rc < 0)
 		goto free_out;
 
@@ -239,7 +239,7 @@ static int smi2021_get_reg(struct smi2021 *smi2021, u8 i2c_addr,
 	rc = usb_control_msg(smi2021->udev, pipe, SMI2021_USB_REQUEST,
 			USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 			transfer_buf->head, SMI2021_USB_INDEX,
-			transfer_buf, sizeof(*transfer_buf), 1000);
+			transfer_buf, sizeof(*transfer_buf), HZ);
 	if (rc < 0)
 		goto free_out;
 
