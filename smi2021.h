@@ -69,7 +69,7 @@
 /* General video constants */
 #define SMI2021_BYTES_PER_LINE	1440
 #define SMI2021_PAL_LINES	576
-#define SMI2021_NTSC_LINES	484
+#define SMI2021_NTSC_LINES	480
 
 /* Timing Referance Codes, see saa7113 datasheet */
 #define SMI2021_TRC_EAV		0x10
