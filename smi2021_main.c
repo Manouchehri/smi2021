@@ -496,8 +496,6 @@ static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
 {
 	struct smi2021_buf *buf = smi2021->cur_buf;
 
-	int lines_per_field = smi2021->cur_height / 2;
-	int max_line_num_per_field = (smi2021->cur_height / 2) - 1;
 	int line = 0;
 	int pos_in_line = 0;
 	unsigned int offset = 0;
