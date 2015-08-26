@@ -425,7 +425,7 @@ static void smi2021_buf_done(struct smi2021 *smi2021)
 static void parse_trc(struct smi2021 *smi2021, u8 trc)
 {
 	struct smi2021_buf *buf = smi2021->cur_buf;
-	int lines_per_field = smi2021->cur_height / 2;
+	int max_line_num_per_field = (smi2021->cur_height / 2) - 1;
 	int line = 0;
 
 	if (!buf) {
@@ -458,7 +458,7 @@ static void parse_trc(struct smi2021 *smi2021, u8 trc)
 		if (!smi2021->skip_frame) {
 			if (!buf->odd && is_field2(trc)) {
 				line = buf->pos / SMI2021_BYTES_PER_LINE;
-				if (line < lines_per_field) {
+				if (line < max_line_num_per_field) {
 					dev_info(smi2021->dev, " WRONG_FIRST_BUF - skip\n");
 					goto buf_done;
 				}
@@ -496,17 +496,19 @@ static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
 	struct smi2021_buf *buf = smi2021->cur_buf;
 
 	int lines_per_field = smi2021->cur_height / 2;
+	int max_line_num_per_field = (smi2021->cur_height / 2) - 1;
 	int line = 0;
 	int pos_in_line = 0;
 	unsigned int offset = 0;
 	u8 *dst;
+	int byte_copied = 0;
 
 	int start_corr, len_copy;
 	start_corr = 0;
 	len_copy = size;
 
-if (smi2021->skip_frame)
-	return;
+	if (smi2021->skip_frame)
+		return;
 
 	if (!buf) {
 		return;
@@ -516,36 +518,45 @@ if (smi2021->skip_frame)
 		return;
 	}
 
-	if (buf->pos >= buf->length) {
-		dev_warn(smi2021->dev, "BLOCK buf->pos %d >= buf->length %d\n", buf->pos, buf->length);
-		smi2021_buf_done(smi2021);
-		return;
-	}
-
 	pos_in_line = buf->pos % SMI2021_BYTES_PER_LINE;
 	line = buf->pos / SMI2021_BYTES_PER_LINE;
 	if (buf->odd) {
 		offset += SMI2021_BYTES_PER_LINE;
-		if (line >= lines_per_field) {
-			line -= lines_per_field;
-		} else {
-			dev_warn(smi2021->dev, "BLOCK ERR second field, but line %d < lines_per_field %d\n", line, lines_per_field);
+		if (line <= max_line_num_per_field) {
+			// most in pal-outpit with ntsc-input
+			buf->pos = buf->pos + ((lines_per_field - line) * SMI2021_BYTES_PER_LINE);
+			line = lines_per_field;
 		}
+		line -= lines_per_field;
+		if (line > max_line_num_per_field)
+			buf->pos = buf->length;
 	}
 
+	offset += (SMI2021_BYTES_PER_LINE * line * 2 ) + pos_in_line;
 
-	offset += (SMI2021_BYTES_PER_LINE * line * 2) + pos_in_line;
-
-	dst = buf->mem + offset;
-	if ( ( buf->pos + size ) > buf->length ) {
-		len_copy = buf->length - (buf->pos + size);
+	if (line > max_line_num_per_field) {
+		len_copy = 0;
 	}
-	if ( len_copy > 0) {
-		if (copy_to_user(dst, p, len_copy )) {
-			dev_warn(smi2021->dev, " Failed copy to user buff: len_copy=%d, line=%d, odd=%d, buf->pos=%d, new buf->pos=%d\n", len_copy, line, buf->odd, buf->pos, buf->pos + len_copy);
+	if ( len_copy && offset >= buf->length ) {
+		len_copy = 0;
+	}
+
+	if ( len_copy > 0 ) {
+		dst = buf->mem + offset;
+		if (offset + len_copy > buf->length) {
+			len_copy = buf->length - offset;
+		}
+		byte_copied = copy_to_user(dst, p, len_copy);
+		if (byte_copied) {
+			dev_warn(smi2021->dev, " Failed copy to user buff: len_copy=%d, not_copied=%d, line=%d, odd=%d, buf->pos=%d, offset=%d, buf->length=%d\n", len_copy, byte_copied, line, buf->odd, buf->pos, offset, buf->length);
 		}
 		buf->pos = buf->pos + len_copy;
 	}
+
+	if (buf->pos >= buf->length) {
+		smi2021_buf_done(smi2021);
+	}
+
 }
 
 /*
