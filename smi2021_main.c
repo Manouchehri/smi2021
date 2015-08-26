@@ -395,11 +395,11 @@ static void smi2021_buf_done(struct smi2021 *smi2021)
 	buf->vb.v4l2_buf.sequence = smi2021->sequence++;
 	buf->vb.v4l2_buf.field = V4L2_FIELD_INTERLACED;
 
-	if (buf->pos < (SMI2021_BYTES_PER_LINE * smi2021->cur_height)) {
+	if (buf->pos < (SMI2021_BYTES_PER_LINE * (smi2021->cur_height/2))) {
 		vb2_set_plane_payload(&buf->vb, 0, 0);
 		vb2_buffer_done(&buf->vb, VB2_BUF_STATE_ERROR);
 	} else {
-		vb2_set_plane_payload(&buf->vb, 0, buf->pos);
+		vb2_set_plane_payload(&buf->vb, 0, buf->pos * 2);
 		vb2_buffer_done(&buf->vb, VB2_BUF_STATE_DONE);
 	}
 
@@ -457,12 +457,13 @@ static void parse_trc(struct smi2021 *smi2021, u8 trc)
 		}
 		if (!smi2021->skip_frame) {
 			if (!buf->odd && is_field2(trc)) {
-				line = buf->pos / SMI2021_BYTES_PER_LINE;
+				line = (buf->pos / SMI2021_BYTES_PER_LINE) - 1;
 				if (line < max_line_num_per_field) {
 					dev_info(smi2021->dev, " WRONG_FIRST_BUF - skip\n");
 					goto buf_done;
 				}
 				buf->odd = true;
+				buf->pos = 0;
 			}
 			if (buf->odd && !is_field2(trc)) {
 				goto buf_done;
@@ -502,6 +503,7 @@ static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
 	unsigned int offset = 0;
 	u8 *dst;
 	int byte_copied = 0;
+	int can_buf_done = 0;
 
 	int start_corr, len_copy;
 	start_corr = 0;
@@ -520,32 +522,25 @@ static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
 
 	pos_in_line = buf->pos % SMI2021_BYTES_PER_LINE;
 	line = buf->pos / SMI2021_BYTES_PER_LINE;
+
 	if (buf->odd) {
 		offset += SMI2021_BYTES_PER_LINE;
-		if (line <= max_line_num_per_field) {
-			// most in pal-outpit with ntsc-input
-			buf->pos = buf->pos + ((lines_per_field - line) * SMI2021_BYTES_PER_LINE);
-			line = lines_per_field;
-		}
-		line -= lines_per_field;
-		if (line > max_line_num_per_field)
-			buf->pos = buf->length;
 	}
 
-	offset += (SMI2021_BYTES_PER_LINE * line * 2 ) + pos_in_line;
+	offset += (SMI2021_BYTES_PER_LINE * line * 2) + pos_in_line;
 
-	if (line > max_line_num_per_field) {
+	if (offset >= buf->length) {
 		len_copy = 0;
-	}
-	if ( len_copy && offset >= buf->length ) {
-		len_copy = 0;
+		can_buf_done = 1;
 	}
 
 	if ( len_copy > 0 ) {
 		dst = buf->mem + offset;
-		if (offset + len_copy > buf->length) {
+		if (offset + len_copy >= buf->length) {
 			len_copy = buf->length - offset;
+			can_buf_done = 1;
 		}
+			
 		byte_copied = copy_to_user(dst, p, len_copy);
 		if (byte_copied) {
 			dev_warn(smi2021->dev, " Failed copy to user buff: len_copy=%d, not_copied=%d, line=%d, odd=%d, buf->pos=%d, offset=%d, buf->length=%d\n", len_copy, byte_copied, line, buf->odd, buf->pos, offset, buf->length);
@@ -553,10 +548,9 @@ static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
 		buf->pos = buf->pos + len_copy;
 	}
 
-	if (buf->pos >= buf->length) {
+	if (can_buf_done && buf->odd) {
 		smi2021_buf_done(smi2021);
 	}
-
 }
 
 /*
