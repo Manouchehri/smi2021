@@ -37,6 +37,10 @@
 	#error  Unable find required dependency: CONFIG_VIDEO_SAA711X in you kernel .config
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 12, 0)
+# error We only support 3.12 and above series kernels
+#endif
+
 #define VENDOR_ID 0x1c88
 #define BOOTLOADER_ID 0x0007
 
