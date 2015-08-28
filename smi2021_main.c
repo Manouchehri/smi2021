@@ -399,11 +399,11 @@ static void smi2021_buf_done(struct smi2021 *smi2021)
 	buf->vb.v4l2_buf.sequence = smi2021->sequence++;
 	buf->vb.v4l2_buf.field = V4L2_FIELD_INTERLACED;
 
-	if (buf->pos < (SMI2021_BYTES_PER_LINE * smi2021->cur_height)) {
+	if (buf->pos < (SMI2021_BYTES_PER_LINE * (smi2021->cur_height/2))) {
 		vb2_set_plane_payload(&buf->vb, 0, 0);
 		vb2_buffer_done(&buf->vb, VB2_BUF_STATE_ERROR);
 	} else {
-		vb2_set_plane_payload(&buf->vb, 0, buf->pos);
+		vb2_set_plane_payload(&buf->vb, 0, buf->pos * 2);
 		vb2_buffer_done(&buf->vb, VB2_BUF_STATE_DONE);
 	}
 
@@ -429,7 +429,7 @@ static void smi2021_buf_done(struct smi2021 *smi2021)
 static void parse_trc(struct smi2021 *smi2021, u8 trc)
 {
 	struct smi2021_buf *buf = smi2021->cur_buf;
-	int lines_per_field = smi2021->cur_height / 2;
+	int max_line_num_per_field = (smi2021->cur_height / 2) - 1;
 	int line = 0;
 
 	if (!buf) {
@@ -461,12 +461,13 @@ static void parse_trc(struct smi2021 *smi2021, u8 trc)
 		}
 		if (!smi2021->skip_frame) {
 			if (!buf->odd && is_field2(trc)) {
-				line = buf->pos / SMI2021_BYTES_PER_LINE;
-				if (line < lines_per_field) {
+				line = (buf->pos / SMI2021_BYTES_PER_LINE) - 1;
+				if (line < max_line_num_per_field) {
 					dev_info(smi2021->dev, " WRONG_FIRST_BUF - skip\n");
 					goto buf_done;
 				}
 				buf->odd = true;
+				buf->pos = 0;
 			}
 			if (buf->odd && !is_field2(trc)) {
 				goto buf_done;
@@ -499,18 +500,21 @@ static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
 {
 	struct smi2021_buf *buf = smi2021->cur_buf;
 
-	int lines_per_field = smi2021->cur_height / 2;
 	int line = 0;
 	int pos_in_line = 0;
 	unsigned int offset = 0;
 	u8 *dst;
+	int byte_copied = 0;
+	int can_buf_done = 0;
+
+	mm_segment_t old_fs;
 
 	int start_corr, len_copy;
 	start_corr = 0;
 	len_copy = size;
 
-if (smi2021->skip_frame)
-	return;
+	if (smi2021->skip_frame)
+		return;
 
 	if (!buf) {
 		return;
@@ -520,35 +524,54 @@ if (smi2021->skip_frame)
 		return;
 	}
 
-	if (buf->pos >= buf->length) {
-		dev_warn(smi2021->dev, "BLOCK buf->pos %d >= buf->length %d\n", buf->pos, buf->length);
-		smi2021_buf_done(smi2021);
-		return;
-	}
-
 	pos_in_line = buf->pos % SMI2021_BYTES_PER_LINE;
 	line = buf->pos / SMI2021_BYTES_PER_LINE;
+
 	if (buf->odd) {
 		offset += SMI2021_BYTES_PER_LINE;
-		if (line >= lines_per_field) {
-			line -= lines_per_field;
-		} else {
-			dev_warn(smi2021->dev, "BLOCK ERR second field, but line %d < lines_per_field %d\n", line, lines_per_field);
-		}
 	}
-
 
 	offset += (SMI2021_BYTES_PER_LINE * line * 2) + pos_in_line;
 
-	dst = buf->mem + offset;
-	if ( ( buf->pos + size ) > buf->length ) {
-		len_copy = buf->length - (buf->pos + size);
+	if (offset >= buf->length) {
+		len_copy = 0;
+		can_buf_done = 1;
 	}
-	if ( len_copy > 0) {
-		if (copy_to_user(dst, p, len_copy )) {
-			dev_warn(smi2021->dev, " Failed copy to user buff: len_copy=%d, line=%d, odd=%d, buf->pos=%d, new buf->pos=%d\n", len_copy, line, buf->odd, buf->pos, buf->pos + len_copy);
+
+	if ( len_copy > 0 ) {
+		dst = buf->mem + offset;
+		if (offset + len_copy >= buf->length) {
+			len_copy = buf->length - offset;
+			can_buf_done = 1;
+		}
+
+		// Issue 12.
+		// Bug in use copy_to_user: sometime size, returned by user_addr_max() is smaller, then already exist pointer to buf from and to - because we
+		// in USER_DS segment.
+		// As result copy_to_user -> access_ok -> user_addr_max == return false and we unable copy data to user space.
+		// In future we can use simple:
+		//  memcpy(dst, p, len_copy);
+		// Because user_addr_max typically eq (~0UL)
+		//
+		// If anybody know more proper way - welcom.
+
+		if (segment_eq(get_fs(), USER_DS)) {
+			//printk_ratelimited(KERN_INFO "smi2021: WARNING !!! Issue 12. We on USER_DS segment. line=%d, buf->pos=%d, len_copy=%d", line, buf->pos, len_copy);
+			old_fs = get_fs();
+			set_fs(KERNEL_DS);
+			byte_copied = copy_to_user((unsigned long *)dst, (unsigned long *)p, (unsigned long )len_copy);
+			set_fs(old_fs);
+		} else {
+			byte_copied = copy_to_user((unsigned long *)dst, (unsigned long *)p, (unsigned long )len_copy);
+		}
+		if (byte_copied) {
+			dev_warn(smi2021->dev, " Failed copy_to_user: USER_DS=%d len_copy=%d, not_copied=%d, line=%d, odd=%d, buf->pos=%d, offset=%d, buf->length=%d FROM=%lu, TO=%lu", segment_eq(get_fs(), USER_DS), len_copy, byte_copied, line, buf->odd, buf->pos, offset, buf->length,  (long unsigned int )p, (long unsigned int )dst);
 		}
 		buf->pos = buf->pos + len_copy;
+	}
+
+	if (can_buf_done && buf->odd) {
+		smi2021_buf_done(smi2021);
 	}
 }
 
@@ -626,8 +649,8 @@ static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
 			break;
 		case TRC:
 			smi2021->sync_state = HSYNC;
-			copy_size = i - 3 - start_copy;
-			if ( copy_size > 0 ) {
+			if ( i > (start_copy + 3) ) {
+				copy_size = i - 3 - start_copy;
 				copy_video_block(smi2021, &(p[start_copy]), copy_size);
 				smi2021->blk_line_read = 0;
 			}
