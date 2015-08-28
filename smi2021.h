@@ -217,9 +217,9 @@ struct smi2021 {
 	bool skip_frame;
 	bool skip_frame_odd;
 
-	int blk_line_start_recheck;
-	int blk_line_read;
-	int to_blk_line_end;
+	unsigned int blk_line_start_recheck;
+	unsigned int blk_line_read;
+	unsigned int to_blk_line_end;
 
 	struct smi2021_chip_type_data_st *chip_type_data;
 };

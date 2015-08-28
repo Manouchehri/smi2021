@@ -496,22 +496,24 @@ buf_done:
 	smi2021->skip_frame_odd = false;
 }
 
-static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
+static void copy_video_block(struct smi2021 *smi2021, u8 *p, unsigned int size)
 {
 	struct smi2021_buf *buf = smi2021->cur_buf;
 
-	int line = 0;
-	int pos_in_line = 0;
+	unsigned int line = 0;
+	unsigned int pos_in_line = 0;
 	unsigned int offset = 0;
 	u8 *dst;
-	int byte_copied = 0;
-	int can_buf_done = 0;
+	unsigned int byte_copied = 0;
+	unsigned int can_buf_done = 0;
 
 	mm_segment_t old_fs;
 
-	int start_corr, len_copy;
-	start_corr = 0;
+	unsigned int len_copy;
 	len_copy = size;
+
+	if (len_copy > 4000)
+		dev_warn(smi2021->dev, "ERROR : copy_video_block len_copy is too large (may be negative?)");
 
 	if (smi2021->skip_frame)
 		return;
@@ -546,7 +548,7 @@ static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
 		}
 
 		// Issue 12.
-		// Bug in use copy_to_user: sometime size, returned by user_addr_max() is smaller, then already exist pointer to buf from and to - because we
+		// Bug in use copy_to_user: sometime size, returned by user_addr_max() is smaller, then already exist pointer to buf from and to - because we 
 		// in USER_DS segment.
 		// As result copy_to_user -> access_ok -> user_addr_max == return false and we unable copy data to user space.
 		// In future we can use simple:
@@ -587,15 +589,24 @@ static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
  * EAV = End Active Video.
  * This is described in the saa7113 datasheet.
  */
-static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
+static void parse_video(struct smi2021 *smi2021, u8 *p, int n_size)
 {
-	int i, start_copy, copy_size, correct1;
+	unsigned int i, start_copy, copy_size, correct1;
+	unsigned int size;
 
 	static u8 trimed[2] = { 0xff, 0x00 };
 
 	correct1 = 0;
 	start_copy = 0;
+	if (n_size >= 0)
+		size = n_size;
+	else {
+		dev_warn(smi2021->dev, "ERROR : parse_video n_size is negative");
+		n_size = 0;
+	}
 
+	if (size > 4000)
+		dev_warn(smi2021->dev, "ERROR : parse_video size is too large (may be negative?).");
 	if ( smi2021->sync_state == SYNCZ1 ) {
 		if (p[0] == 0x00 && p[1] == 0x00) {
 			start_copy = 3;
@@ -622,6 +633,8 @@ static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
 				smi2021->to_blk_line_end = SMI2021_BYTES_PER_LINE;
 				smi2021->blk_line_read = 0;
 			}
+			if (copy_size > 4000)
+				dev_warn(smi2021->dev, "ERROR : parse_video copy_size is too large (may be negative?)");
 			copy_video_block(smi2021, &(p[start_copy]), copy_size);
 			i = i + copy_size;
 			start_copy = i + 1 + 3;
@@ -677,16 +690,22 @@ static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
  */
 static void process_packet(struct smi2021 *smi2021, u8 *p, int size)
 {
-	int i;
+	unsigned int i,u_size;
 	u32 *header;
 
-	if (size % 0x400 != 0) {
-		printk_ratelimited(KERN_INFO "smi2021::%s: size: %d\n",
-				__func__, size);
+	if (size > 0)
+		u_size = size;
+	else {
+		printk_ratelimited(KERN_INFO "smi2021:: ERROR : process_packet size is negative.\n");
+	}
+
+	if (u_size % 0x400 != 0) {
+		printk_ratelimited(KERN_INFO "smi2021::%s: u_size: %u\n",
+				__func__, u_size);
 		return;
 	}
 
-	for (i = 0; i < size; i += 0x400) {
+	for (i = 0; i < u_size; i += 0x400) {
 		header = (u32 *)(p + i);
 		switch (*header) {
 		case cpu_to_be32(0xaaaa0000):
@@ -722,7 +741,7 @@ static void smi2021_iso_cb(struct urb *ip)
 
 	for (i = 0; i < ip->number_of_packets; i++) {
 		int size = ip->iso_frame_desc[i].actual_length;
-		unsigned char *data = ip->transfer_buffer +
+		u8 *data = ip->transfer_buffer +
 				ip->iso_frame_desc[i].offset;
 
 		process_packet(smi2021, data, size);
