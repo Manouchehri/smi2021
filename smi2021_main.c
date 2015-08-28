@@ -552,7 +552,7 @@ static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
 		// If anybody know more proper way - welcom.
 
 		if (segment_eq(get_fs(), USER_DS)) {
-			printk_ratelimited(KERN_WARNING "smi2021: WARNING !!! Issue 12. We on USER_DS segment. line=%d, buf->pos=%d, len_copy=%d", line, buf->pos, len_copy);
+			//printk_ratelimited(KERN_INFO "smi2021: WARNING !!! Issue 12. We on USER_DS segment. line=%d, buf->pos=%d, len_copy=%d", line, buf->pos, len_copy);
 			old_fs = get_fs();
 			set_fs(KERNEL_DS);
 			byte_copied = copy_to_user((unsigned long *)dst, (unsigned long *)p, (unsigned long )len_copy);
