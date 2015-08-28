@@ -65,18 +65,23 @@ You can build that module one of the two options: as `internal` or as `external`
 
 After installing the module, you will have to copy `firmware/smi2021_3c.bin` (md5sum: `90f78491e831e8db44cfdd6204a2b602`) as `/usr/lib/firmware/smi2021_3c.bin`. If you Google the hash, you'll find guides that explain how to extract it.
 
-#### Verify installation
-
-- you can check, what `saa7115` module proper init you device (need once on first install, or new linux distrib, or with new smi2021 device(for proper check what they detected correct)). 
-For that check, you need 
-    - load saa7115 modules with debug: ```modprobe -r saa7115; modprobe saa7115 debug=1```
-    - load smi2021 and check dmesg: must be string like: ```saa7115 8-004a: gm7113c found @ 0x94 (smi2021)```
-
 ## Module parameters
 
-- forceasgm - default 0. If set to 1 chipset version be showed as 10 - supported now version in saa7115 modules for detect current chip as gm7113c.
+- forceasgm - default 0. If set to 1 chipset version be set as gm7113C - supported now version in saa7115 modules.
 In kernel command line it look like smi2021.forceasgm=1. In build as internal module we can set VIDEO\_SMI2021\_INIT\_AS\_GM7113C, but that not recommended, as module parameter present.
 - monochrome - default 0. If set to 1 on init output be in monochrome mode only.
+- chiptype - default 0. You can skip autodetection and set chip version directly: 1 = gm7113C, 2 = saa7113.
+    - NOTICE: if you set 1 (gm7113C) - saa7115 module can incorrectly detect you chip, because now present some change in registry out and that part in under development. For module work as before - **NEED** use `forceasgm=1`
+    - NOTICE: chiptype **NOT** override version for other kernel module. For module work as before - **NEED** use `forceasgm=1`
+
+## Troubleshooting
+
+- monochrome output or no output - you need check, what `saa7115` module proper init you device (need once on first install, or new linux distrib, or with new smi2021 device(for proper check what they detected correct)).
+For that check, you need
+    1. load saa7115 modules with debug: ```modprobe -r saa7115; modprobe saa7115 debug=1```
+    2. load smi2021 and check dmesg: must be string like: ```saa7115 8-004a: gm7113c found @ 0x94 (smi2021)```
+If detection not work, or work notproper - try use `forceasgm=1` module option. For build as part of kernel and use override - be added additional options in Kconfig.
+
 
 ## Credits
 

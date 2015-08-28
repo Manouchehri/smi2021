@@ -52,17 +52,53 @@
 #ifndef VIDEO_SMI2021_INIT_AS_GM7113C
 static short int forceasgm = 0;
 module_param(forceasgm, short, S_IRUGO );
-MODULE_PARM_DESC(forceasgm, "On 1 override gm7113 chip version to 10. Default 0");
+MODULE_PARM_DESC(forceasgm, " if 1 - force initialization chip on board as gm7113. Default 0");
 #else
 static short int forceasgm = 1;
 module_param(forceasgm, short, S_IRUGO );
-MODULE_PARM_DESC(forceasgm, "Not used. Compile time set to always return gm7113 chip version as 10.");
+MODULE_PARM_DESC(forceasgm, " Compile time set. Chip be inited as gm7113. For autodetect or manual set - use 0");
 #endif
-static short int ver_chip_orig_get = 0;
+
+#define CHIP_VER_SIZE   16
+
+#if defined(VIDEO_SMI2021_CHIP_GM7113C)
+#undef VIDEO_SMI2021_CHIP_AUTODETECT
+static short int chiptype = GM7113C + 1;
+#elif defined(VIDEO_SMI2021_CHIP_SAA7113)
+#undef VIDEO_SMI2021_CHIP_AUTODETECT
+static short int chiptype = SAA7113 + 1;
+#else
+#ifndef VIDEO_SMI2021_CHIP_AUTODETECT
+#define VIDEO_SMI2021_CHIP_AUTODETECT y
+#endif
+static short int chiptype = 0;
+#endif
+
+#ifndef VIDEO_SMI2021_CHIP_AUTODETECT
+module_param(chiptype, short, S_IRUGO );
+MODULE_PARM_DESC(chiptype, "Compile time set. For autodetection - use 0");
+#else
+module_param(chiptype, short, S_IRUGO );
+MODULE_PARM_DESC(chiptype, "On not 0 - skip autodetection and force set chip type. Default 0");
+#endif
 
 static short int monochrome = 0;
 module_param(monochrome, short, S_IRUGO );
 MODULE_PARM_DESC(monochrome, "On init set monochrome output in chip. Default 0");
+
+static struct smi2021_chip_type_data_st  smi2021_chip_type_data[] = {
+	[SAA7113] = {
+		.model_id = SAA7113,
+		.model_string = "saa7113",
+		.model_identifier = "f711",
+	},
+	[GM7113C] = {
+		.model_id = GM7113C,
+		.model_string = "gm7113",
+		.model_identifier = "unknown", // Now i not have test result for gm7113 chip - use that if chip not SAA. Issue 15.
+	},
+};
+
 
 static int smi2021_set_mode(struct smi2021 *smi2021, u8 mode)
 {
@@ -121,61 +157,6 @@ struct smi2021_reg_ctrl_transfer {
 		u8 reserved[8];
 	} __packed data;
 } __packed;
-
-static int smi2021_set_reg(struct smi2021 *smi2021, u8 i2c_addr,
-			   u16 reg, u8 val)
-{
-	struct smi2021_reg_ctrl_transfer *transfer_buf;
-	int rc, pipe;
-
-	static const struct smi2021_reg_ctrl_transfer smi_data = {
-		.head = SMI2021_REG_CTRL_HEAD,
-		.i2c_addr = 0x00,
-		.data_cntl = 0x00,
-		.data_offset = 0x82,
-		.data_size = sizeof(u8),
-	};
-
-	static const struct smi2021_reg_ctrl_transfer i2c_data = {
-		.head = SMI2021_REG_CTRL_HEAD,
-		.i2c_addr = 0x00,
-		.data_cntl = 0xc0,
-		.data_offset = 0x01,
-		.data_size = sizeof(u8)
-	};
-
-	if (!smi2021->udev) {
-		rc = -ENODEV;
-		goto out;
-	}
-
-	transfer_buf = kzalloc(sizeof(*transfer_buf), GFP_KERNEL);
-	if (!transfer_buf) {
-		rc = -ENOMEM;
-		goto out;
-	}
-
-	if (i2c_addr) {
-		memcpy(transfer_buf, &i2c_data, sizeof(*transfer_buf));
-		transfer_buf->i2c_addr = i2c_addr;
-		transfer_buf->data.i2c_data.reg = reg;
-		transfer_buf->data.i2c_data.val = val;
-	} else {
-		memcpy(transfer_buf, &smi_data, sizeof(*transfer_buf));
-		transfer_buf->data.smi_data.reg = cpu_to_be16(reg);
-		transfer_buf->data.smi_data.val = val;
-	}
-
-	pipe = usb_sndctrlpipe(smi2021->udev, SMI2021_USB_SNDPIPE);
-	rc = usb_control_msg(smi2021->udev, pipe, SMI2021_USB_REQUEST,
-			USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-			transfer_buf->head, SMI2021_USB_INDEX,
-			transfer_buf, sizeof(*transfer_buf), HZ);
-
-	kfree(transfer_buf);
-out:
-	return rc;
-}
 
 static int smi2021_get_reg(struct smi2021 *smi2021, u8 i2c_addr,
 			   u16 reg, u8 *val)
@@ -247,13 +228,79 @@ static int smi2021_get_reg(struct smi2021 *smi2021, u8 i2c_addr,
 	if (rc < 0)
 		goto free_out;
 
-	if (forceasgm && i2c_addr == 0x4a && reg == 0x00 && transfer_buf->data.val != 0x10 && ver_chip_orig_get) {
+	if (forceasgm && i2c_addr == 0x4a && reg == 0x00) {
 		*val = 0x10;
 	} else {
 		*val = transfer_buf->data.val;
-	}
+	} 
 
 free_out:
+	kfree(transfer_buf);
+out:
+	return rc;
+}
+
+static int smi2021_set_reg(struct smi2021 *smi2021, u8 i2c_addr,
+			   u16 reg, u8 val)
+{
+	struct smi2021_reg_ctrl_transfer *transfer_buf;
+	int rc, pipe;
+	u8 check_read;
+
+	static const struct smi2021_reg_ctrl_transfer smi_data = {
+		.head = SMI2021_REG_CTRL_HEAD,
+		.i2c_addr = 0x00,
+		.data_cntl = 0x00,
+		.data_offset = 0x82,
+		.data_size = sizeof(u8),
+	};
+
+	static const struct smi2021_reg_ctrl_transfer i2c_data = {
+		.head = SMI2021_REG_CTRL_HEAD,
+		.i2c_addr = 0x00,
+		.data_cntl = 0xc0,
+		.data_offset = 0x01,
+		.data_size = sizeof(u8)
+	};
+
+	if (!smi2021->udev) {
+		rc = -ENODEV;
+		goto out;
+	}
+
+	transfer_buf = kzalloc(sizeof(*transfer_buf), GFP_KERNEL);
+	if (!transfer_buf) {
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	if (i2c_addr) {
+		memcpy(transfer_buf, &i2c_data, sizeof(*transfer_buf));
+		transfer_buf->i2c_addr = i2c_addr;
+		transfer_buf->data.i2c_data.reg = reg;
+		transfer_buf->data.i2c_data.val = val;
+	} else {
+		memcpy(transfer_buf, &smi_data, sizeof(*transfer_buf));
+		transfer_buf->data.smi_data.reg = cpu_to_be16(reg);
+		transfer_buf->data.smi_data.val = val;
+	}
+
+	pipe = usb_sndctrlpipe(smi2021->udev, SMI2021_USB_SNDPIPE);
+	rc = usb_control_msg(smi2021->udev, pipe, SMI2021_USB_REQUEST,
+			USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+			transfer_buf->head, SMI2021_USB_INDEX,
+			transfer_buf, sizeof(*transfer_buf), 1000);
+	if ( i2c_addr == 0x4a && reg == 0x00 ) {
+		smi2021_get_reg(smi2021, i2c_addr, reg, &check_read);
+		if ( check_read == 0x00) {
+			dev_warn(smi2021->dev, "WARNING !!! Issue #15. Response to chip version request contains an error and request automatic once restarted.");
+			rc = usb_control_msg(smi2021->udev, pipe, SMI2021_USB_REQUEST,
+					USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+					transfer_buf->head, SMI2021_USB_INDEX,
+					transfer_buf, sizeof(*transfer_buf), 1000);
+		}
+	}
+
 	kfree(transfer_buf);
 out:
 	return rc;
@@ -279,8 +326,6 @@ static int smi2021_i2c_xfer(struct i2c_adapter *i2c_adap,
 			break;
 		else if (msgs[0].len != 2)
 			goto err_out;
-		if (msgs[0].buf[0] == 0)
-			break;
 		smi2021_set_reg(smi2021, msgs[0].addr, msgs[0].buf[0],
 							msgs[0].buf[1]);
 		break;
@@ -1016,11 +1061,13 @@ static int smi2021_usb_probe(struct usb_interface *intf,
 					const struct usb_device_id *devid)
 {
 	int rc, size, input_count;
+	int i;
+	char current_chip_ver[CHIP_VER_SIZE + 1];
 	const struct smi2021_vid_input *vid_inputs;
 	struct device *dev = &intf->dev;
 	struct usb_device *udev = interface_to_usbdev(intf);
 	struct smi2021 *smi2021;
-	u8 ver_chip;
+	u8 reg;
 
 	if (udev->descriptor.idProduct == BOOTLOADER_ID)
 		return smi2021_bootloader_probe(intf, devid);
@@ -1057,6 +1104,38 @@ static int smi2021_usb_probe(struct usb_interface *intf,
 	smi2021->vid_inputs = vid_inputs;
 	smi2021->iso_size = size;
 
+	if (forceasgm) {
+		dev_err(dev, "Chip FORCED detection as gm7113");
+		smi2021->chip_type_data = &smi2021_chip_type_data[GM7113C];
+	} else {
+		if (chiptype <= 0 || chiptype > (sizeof(smi2021_chip_type_data) / sizeof(smi2021_chip_type_data[0]))) {
+			smi2021->chip_type_data = &smi2021_chip_type_data[GM7113C]; // Default
+			dev_err(dev, "Chip autodetection start");
+			for (i = 0; i < CHIP_VER_SIZE; i++) {
+				smi2021_set_reg(smi2021, 0x4a, 0x00, i);
+				smi2021_get_reg(smi2021, 0x4a, 0x00, &reg);
+				current_chip_ver[i] = (reg & 0x0f) + '0';
+				if (current_chip_ver[i] > '9')
+					current_chip_ver[i] += 'a' - '9' - 1;
+			}
+			current_chip_ver[CHIP_VER_SIZE] = '\0';
+			smi2021_set_reg(smi2021, 0x4a, 0x00, 0x00);
+			smi2021_get_reg(smi2021, 0x4a, 0x00, &reg);
+			dev_warn(dev, " try detect for: %s\n", current_chip_ver);
+			for (i = 0; smi2021_chip_type_data[i].model_string; i++ ) {
+				if (!memcmp(current_chip_ver + 1, smi2021_chip_type_data[i].model_identifier, strlen(smi2021_chip_type_data[i].model_identifier))) {
+					smi2021->chip_type_data = &smi2021_chip_type_data[i];
+					dev_warn(dev, "detected as %s\n", smi2021->chip_type_data->model_string);
+				}
+			}
+		} else {
+			smi2021->chip_type_data = &smi2021_chip_type_data[chiptype - 1];
+			dev_err(dev, "Skip chip autodetection");
+		}
+	}
+
+	dev_warn(dev, " You chip is: %s \n", smi2021->chip_type_data->model_string);
+
 	/* videobuf2 struct and locks */
 
 	spin_lock_init(&smi2021->buf_lock);
@@ -1084,22 +1163,6 @@ static int smi2021_usb_probe(struct usb_interface *intf,
 		goto free_ctrl;
 	}
 
-	smi2021_get_reg(smi2021, 0x4a, 0x00, &ver_chip);
-	ver_chip_orig_get = 1;
-
-#ifndef VIDEO_SMI2021_INIT_AS_GM7113C
-	if (ver_chip != 0x10) {
-		if (forceasgm) {
-			dev_warn(dev, "Not supported chip version %x overrided by 10\n", ver_chip);
-		} else {
-			dev_warn(dev, "WARNING !!! Your version=%x of chip may NOT be SUPPORTED in saa7115 module !!! Please make sure that the chip is initialized as gm7113c in saa7115 module (To see this, you may need load the saa7115 module with option debug=1)", ver_chip);
-		}
-	}
-#else
-	if (ver_chip != 0x10) {
-		dev_warn(dev, "Not supported chip version %x overrided statically by 10 in build time.", ver_chip);
-	}
-#endif
 
 	smi2021_initialize(smi2021);
 	smi2021->skip_frame = false;
@@ -1140,14 +1203,28 @@ static int smi2021_usb_probe(struct usb_interface *intf,
 	smi2021->gm7113c_platform_data.saa7113_r13_adlsb =
 					&smi2021->gm7113c_overrides.r13_adlsb;
 
-	smi2021->gm7113c_info.addr = 0x4a;
-	smi2021->gm7113c_info.platform_data = &smi2021->gm7113c_platform_data;
-	strlcpy(smi2021->gm7113c_info.type, "gm7113c",
-					sizeof(smi2021->gm7113c_info.type));
+	switch (smi2021->chip_type_data->model_id) {
+		case SAA7113:
+			smi2021->saa7113_info.addr = 0x4a;
+			smi2021->saa7113_info.platform_data = &smi2021->saa7113_platform_data;
+			strlcpy(smi2021->saa7113_info.type, "saa7113",
+							sizeof(smi2021->saa7113_info.type));
 
-	smi2021->gm7113c_subdev = v4l2_i2c_new_subdev_board(&smi2021->v4l2_dev,
-							&smi2021->i2c_adap,
-							&smi2021->gm7113c_info, NULL);
+			smi2021->gm7113c_subdev = v4l2_i2c_new_subdev_board(&smi2021->v4l2_dev,
+									&smi2021->i2c_adap,
+									&smi2021->saa7113_info, NULL);
+		break;
+		case GM7113C:
+		default:
+			smi2021->gm7113c_info.addr = 0x4a;
+			smi2021->gm7113c_info.platform_data = &smi2021->gm7113c_platform_data;
+			strlcpy(smi2021->gm7113c_info.type, "gm7113c",
+							sizeof(smi2021->gm7113c_info.type));
+
+			smi2021->gm7113c_subdev = v4l2_i2c_new_subdev_board(&smi2021->v4l2_dev,
+									&smi2021->i2c_adap,
+									&smi2021->gm7113c_info, NULL);
+	}
 	/* NTSC is default */
 	smi2021->cur_norm = V4L2_STD_NTSC;
 	smi2021->cur_height = SMI2021_NTSC_LINES;
