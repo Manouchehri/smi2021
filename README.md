@@ -94,5 +94,3 @@ mastervolkov - mastervolkov@gmail.com
 https://github.com/Manouchehri/smi2021
 
 https://github.com/jonjonarnearne/smi2021
-
-https://github.com/mastervolkov/smi2021
