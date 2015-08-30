@@ -463,7 +463,7 @@ static void parse_trc(struct smi2021 *smi2021, u8 trc)
 			if (!buf->odd && is_field2(trc)) {
 				line = (buf->pos / SMI2021_BYTES_PER_LINE) - 1;
 				if (line < max_line_num_per_field) {
-					dev_info(smi2021->dev, " WRONG_FIRST_BUF - skip\n");
+					dev_info(smi2021->dev, "Skip broken frame: %d line, but need %d in current %d height", line + 1, max_line_num_per_field + 1, smi2021->cur_height);
 					goto buf_done;
 				}
 				buf->odd = true;
