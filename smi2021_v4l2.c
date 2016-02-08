@@ -186,9 +186,14 @@ static const struct v4l2_ioctl_ops smi2021_ioctl_ops = {
 /*
  * Videobuf2 operations
  */
-static int queue_setup(struct vb2_queue *vq, const void *parg,
-				unsigned int *nbuffers, unsigned int *nplanes,
-				unsigned int sizes[], void *alloc_ctxs[])
+static int queue_setup(struct vb2_queue *vq,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
+			const struct v4l2_format *v4l2_fmt,
+#else
+			const void *parg,
+#endif
+			unsigned int *nbuffers, unsigned int *nplanes,
+			unsigned int sizes[], void *alloc_ctxs[])
 {
 	struct smi2021 *smi2021 = vb2_get_drv_priv(vq);
 	*nbuffers = clamp_t(unsigned int, *nbuffers, 4, 16);
@@ -208,15 +213,22 @@ static void buffer_queue(struct vb2_buffer *vb)
 {
 	unsigned long flags;
 	struct smi2021 *smi2021 = vb2_get_drv_priv(vb->vb2_queue);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
+	struct smi2021_buf *buf = container_of(vb, struct smi2021_buf, vb);
+#else
 	struct smi2021_buf *buf = container_of(vb, struct smi2021_buf, vb.vb2_buf);
-
+#endif
 	spin_lock_irqsave(&smi2021->buf_lock, flags);
 	if (!smi2021->udev) {
 		/*
 		 * If the device is disconnected return the buffer to userspace
 		 * directly. The next QBUF call will fail with -ENODEV.
 		 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
+		vb2_buffer_done(&buf->vb, VB2_BUF_STATE_ERROR);
+#else
 		vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_ERROR);
+#endif
 	} else {
 		buf->mem = vb2_plane_vaddr(vb, 0);
 		buf->length = vb2_plane_size(vb, 0);
@@ -230,7 +242,11 @@ static void buffer_queue(struct vb2_buffer *vb)
 		 * we return the buffer back to userspace
 		 */
 		if (buf->length < SMI2021_BYTES_PER_LINE * smi2021->cur_height)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
+			vb2_buffer_done(&buf->vb, VB2_BUF_STATE_ERROR);
+#else
 			vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_ERROR);
+#endif
 		else
 			list_add_tail(&buf->list, &smi2021->avail_bufs);
 	}
@@ -283,16 +299,28 @@ void smi2021_clear_queue(struct smi2021 *smi2021)
 		buf = list_first_entry(&smi2021->avail_bufs,
 				struct smi2021_buf, list);
 		list_del(&buf->list);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
+		vb2_buffer_done(&buf->vb, VB2_BUF_STATE_ERROR);
+		dev_info(smi2021->dev, "buffer [%p/%d] aborted\n",
+				buf, buf->vb.v4l2_buf.index);
+#else
 		vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_ERROR);
 		dev_info(smi2021->dev, "buffer [%p/%d] aborted\n",
 				buf, buf->vb.vb2_buf.index);
+#endif
 	}
 	/* It's important to clear current buffer */
 	if (smi2021->cur_buf) {
 		buf = smi2021->cur_buf;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
+		vb2_buffer_done(&buf->vb, VB2_BUF_STATE_ERROR);
+		dev_info(smi2021->dev, "buffer [%p/%d] aborted\n",
+				buf, buf->vb.v4l2_buf.index);
+#else
 		vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_ERROR);
 		dev_info(smi2021->dev, "buffer [%p/%d] aborted\n",
 				buf, buf->vb.vb2_buf.index);
+#endif
 	}
 	smi2021->cur_buf = NULL;
 	spin_unlock_irqrestore(&smi2021->buf_lock, flags);
