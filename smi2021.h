@@ -106,7 +106,11 @@ struct smi2021_set_hw_state {
 /* A single videobuf2 frame buffer */
 struct smi2021_buf {
 	/* Common vb2 stuff, must be first */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
 	struct vb2_buffer		vb;
+#else
+	struct vb2_v4l2_buffer		vb;
+#endif
 	struct list_head		list;
 
 	void				*mem;
@@ -130,7 +134,7 @@ enum smi2021_sync {
 };
 
 /* Chip version */
-enum { 
+enum {
 	GM7113C,
 	SAA7113,
 };

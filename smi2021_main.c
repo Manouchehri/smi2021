@@ -232,7 +232,7 @@ static int smi2021_get_reg(struct smi2021 *smi2021, u8 i2c_addr,
 		*val = 0x10;
 	} else {
 		*val = transfer_buf->data.val;
-	} 
+	}
 
 free_out:
 	kfree(transfer_buf);
@@ -394,17 +394,32 @@ static struct smi2021_buf *smi2021_get_buf(struct smi2021 *smi2021)
 static void smi2021_buf_done(struct smi2021 *smi2021)
 {
 	struct smi2021_buf *buf = smi2021->cur_buf;
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
 	v4l2_get_timestamp(&buf->vb.v4l2_buf.timestamp);
 	buf->vb.v4l2_buf.sequence = smi2021->sequence++;
 	buf->vb.v4l2_buf.field = V4L2_FIELD_INTERLACED;
-
+#else
+	v4l2_get_timestamp(&buf->vb.timestamp);
+	buf->vb.sequence = smi2021->sequence++;
+	buf->vb.field = V4L2_FIELD_INTERLACED;
+#endif
 	if (buf->pos < (SMI2021_BYTES_PER_LINE * (smi2021->cur_height/2))) {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
 		vb2_set_plane_payload(&buf->vb, 0, 0);
 		vb2_buffer_done(&buf->vb, VB2_BUF_STATE_ERROR);
+#else
+		vb2_set_plane_payload(&buf->vb.vb2_buf, 0, 0);
+		vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_ERROR);
+#endif
 	} else {
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
 		vb2_set_plane_payload(&buf->vb, 0, buf->pos * 2);
 		vb2_buffer_done(&buf->vb, VB2_BUF_STATE_DONE);
+#else
+		vb2_set_plane_payload(&buf->vb.vb2_buf, 0, buf->pos * 2);
+		vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_DONE);
+#endif
 	}
 
 	smi2021->cur_buf = NULL;
@@ -660,7 +675,7 @@ static void parse_video(struct smi2021 *smi2021, u8 *p, int size)
 		}
 	}
 	if ( start_copy < size ) {
-		if ( smi2021->sync_state == SYNCZ1 ) 
+		if ( smi2021->sync_state == SYNCZ1 )
 			correct1 = 1;
 		else if ( smi2021->sync_state == SYNCZ2 )
 			correct1 = 2;
@@ -993,7 +1008,7 @@ int smi2021_stop(struct smi2021 *smi2021)
 	smi2021_cancel_isoc(smi2021);
 
 	smi2021_stop_hw(smi2021);
-	
+
 	smi2021_clear_queue(smi2021);
 
 	dev_notice(smi2021->dev, "streaming stopped\n");
