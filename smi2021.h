@@ -43,7 +43,11 @@
 #include <media/v4l2-ctrls.h>
 #include <media/videobuf2-core.h>
 #include <media/videobuf2-vmalloc.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
+#include <media/i2c/saa7115.h>
+#else
 #include <media/saa7115.h>
+#endif
 
 #include <sound/core.h>
 #include <sound/pcm.h>
