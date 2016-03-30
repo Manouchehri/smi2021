@@ -399,7 +399,11 @@ static void smi2021_buf_done(struct smi2021 *smi2021)
 	buf->vb.v4l2_buf.sequence = smi2021->sequence++;
 	buf->vb.v4l2_buf.field = V4L2_FIELD_INTERLACED;
 #else
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)
 	v4l2_get_timestamp(&buf->vb.timestamp);
+#else
+	buf->vb.vb2_buf.timestamp = ktime_get_ns();
+#endif
 	buf->vb.sequence = smi2021->sequence++;
 	buf->vb.field = V4L2_FIELD_INTERLACED;
 #endif
