@@ -189,7 +189,7 @@ static const struct v4l2_ioctl_ops smi2021_ioctl_ops = {
 static int queue_setup(struct vb2_queue *vq,
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
 			const struct v4l2_format *v4l2_fmt,
-#elif LINUX_VERSION_CODE == KERNEL_VERSION(4, 4, 0)
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)
 /* Causes a queue_setup crash in 4.5.0 kernel, so skip */
 			const void *parg,
 #endif
