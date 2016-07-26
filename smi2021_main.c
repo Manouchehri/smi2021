@@ -1164,10 +1164,11 @@ static int smi2021_usb_probe(struct usb_interface *intf,
 			smi2021_set_reg(smi2021, 0x4a, 0x00, 0x00);
 			smi2021_get_reg(smi2021, 0x4a, 0x00, &reg);
 			dev_warn(dev, " try detect for: %s\n", current_chip_ver);
-			for (i = 0; smi2021_chip_type_data[i].model_string; i++ ) {
+			for (i = 0; i < sizeof(smi2021_chip_type_data) / sizeof(smi2021_chip_type_data[0]); i++ ) {
 				if (!memcmp(current_chip_ver + 1, smi2021_chip_type_data[i].model_identifier, strlen(smi2021_chip_type_data[i].model_identifier))) {
 					smi2021->chip_type_data = &smi2021_chip_type_data[i];
 					dev_warn(dev, "detected as %s\n", smi2021->chip_type_data->model_string);
+                    break;
 				}
 			}
 		} else {
