@@ -194,7 +194,13 @@ static int queue_setup(struct vb2_queue *vq,
 			const void *parg,
 #endif
 			unsigned int *nbuffers, unsigned int *nplanes,
-			unsigned int sizes[], void *alloc_ctxs[])
+			unsigned int sizes[],
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+			void *alloc_ctxs[]
+#else
+			struct device *alloc_devs[]
+#endif
+			)
 {
 	struct smi2021 *smi2021 = vb2_get_drv_priv(vq);
 	*nbuffers = clamp_t(unsigned int, *nbuffers, 4, 16);
