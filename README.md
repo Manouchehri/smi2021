@@ -85,7 +85,7 @@ If detection not work, or work notproper - try use `forceasgm=1` module option. 
 
 ## Credits
 
-David Manouchehri - david@davidmanouchehri.com
+David Manouchehri
 
 Jon Arne Jørgensen - jonjon.arnearne@gmail.com
 
