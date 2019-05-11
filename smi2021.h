@@ -235,7 +235,6 @@ struct smi2021 {
 /* Provided by smi2021_bootloader.c */
 int smi2021_bootloader_probe(struct usb_interface *intf,
 					const struct usb_device_id *devid);
-void smi2021_bootloader_disconnect(struct usb_interface *intf);
 
 /* Provided by smi2021_main.c */
 void smi2021_toggle_audio(struct smi2021 *smi2021, bool enable);
