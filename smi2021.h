@@ -35,6 +35,7 @@
 #include <linux/usb.h>
 #include <linux/i2c.h>
 #include <linux/slab.h>
+#include <linux/version.h>
 #include <linux/vmalloc.h>
 
 #include <media/v4l2-device.h>
