@@ -924,14 +924,6 @@ int smi2021_start(struct smi2021 *smi2021)
 	v4l2_subdev_call(smi2021->gm7113c_subdev, video, s_stream, 1);
 
 	/*
-	 * Enble automatic field detection on gm7113c (Bit 7)
-	 * It seems the device needs this to not fail when receiving bad video
-	 * i.e. from an old VHS tape.
-	 */
-	smi2021_get_reg(smi2021, 0x4a, 0x08, &reg);
-	smi2021_set_reg(smi2021, 0x4a, 0x08, reg | 0x80);
-
-	/*
 	 * Reset RTSO0 6 Times (Bit 7)
 	 * The Windows driver does this, not sure if it's really needed.
 	 */
