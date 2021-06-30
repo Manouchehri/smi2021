@@ -1076,19 +1076,19 @@ static const struct smi2021_vid_input dual_input[] = {
 static const struct smi2021_vid_input quad_input[] = {
 	{
 		.name = "Composite 0",
-		.type = SAA7115_COMPOSITE0,
-	},
-	{
-		.name = "Composite 1",
-		.type = SAA7115_COMPOSITE1,
-	},
-	{
-		.name = "Composite 2",
 		.type = SAA7115_COMPOSITE2,
 	},
 	{
-		.name = "Composite 3",
+		.name = "Composite 1",
 		.type = SAA7115_COMPOSITE3,
+	},
+	{
+		.name = "Composite 2",
+		.type = SAA7115_COMPOSITE0,
+	},
+	{
+		.name = "Composite 3",
+		.type = SAA7115_COMPOSITE1,
 	},
 };
 
