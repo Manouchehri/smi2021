@@ -574,7 +574,11 @@ static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
 		//
 		// If anybody know more proper way - welcom.
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
+	if (!uaccess_kernel()) {
+#else
 		if (segment_eq(get_fs(), USER_DS)) {
+#endif
 			//printk_ratelimited(KERN_INFO "smi2021: WARNING !!! Issue 12. We on USER_DS segment. line=%d, buf->pos=%d, len_copy=%d", line, buf->pos, len_copy);
 			old_fs = get_fs();
 			set_fs(KERNEL_DS);
@@ -584,7 +588,11 @@ static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
 			byte_copied = copy_to_user((unsigned long *)dst, (unsigned long *)p, (unsigned long )len_copy);
 		}
 		if (byte_copied) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5 ,9, 0)
+			dev_warn(smi2021->dev, " Failed copy_to_user: USER_DS=%d len_copy=%d, not_copied=%d, line=%d, odd=%d, buf->pos=%d, offset=%d, buf->length=%d FROM=%lu, TO=%lu", uaccess_kernel(), len_copy, byte_copied, line, buf->odd, buf->pos, offset, buf->length,  (long unsigned int )p, (long unsigned int )dst);
+#else
 			dev_warn(smi2021->dev, " Failed copy_to_user: USER_DS=%d len_copy=%d, not_copied=%d, line=%d, odd=%d, buf->pos=%d, offset=%d, buf->length=%d FROM=%lu, TO=%lu", segment_eq(get_fs(), USER_DS), len_copy, byte_copied, line, buf->odd, buf->pos, offset, buf->length,  (long unsigned int )p, (long unsigned int )dst);
+#endif
 		}
 		buf->pos = buf->pos + len_copy;
 	}
@@ -1119,8 +1127,14 @@ static int smi2021_usb_probe(struct usb_interface *intf,
 	if (intf->altsetting[2].desc.bNumEndpoints != 1)
 		return -ENODEV;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 71)
+	size = usb_endpoint_maxp(&intf->altsetting[2].endpoint[0].desc);
+	size = (size & 0x07ff) * usb_endpoint_maxp_mult(&intf->altsetting[2].endpoint[0].desc);
+#else
 	size = usb_endpoint_maxp(&intf->altsetting[2].endpoint[0].desc);
 	size = (size & 0x07ff) * (((size & 0x1800) >> 11) + 1);
+#endif
+	printk("size: %d", size);
 
 	switch (udev->descriptor.idProduct) {
 	case 0x3e:

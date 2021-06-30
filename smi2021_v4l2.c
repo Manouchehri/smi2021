@@ -341,7 +341,7 @@ int smi2021_vb2_setup(struct smi2021 *smi2021)
 
 	q = &smi2021->vb_vidq;
 	q->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	q->io_modes = VB2_READ | VB2_MMAP | VB2_USERPTR;
+	q->io_modes = VB2_READ | VB2_MMAP | VB2_USERPTR  | VB2_DMABUF;
 	q->drv_priv = smi2021;
 	q->buf_struct_size = sizeof(struct smi2021_buf);
 	q->ops = &smi2021_video_qops;
@@ -374,9 +374,19 @@ int smi2021_video_register(struct smi2021 *smi2021)
 
 	/* This will be used to set video_device parent */
 	smi2021->vdev.v4l2_dev = &smi2021->v4l2_dev;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
+	smi2021->vdev.device_caps = V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_STREAMING |
+		V4L2_CAP_READWRITE;
+
+#endif
 
 	video_set_drvdata(&smi2021->vdev, smi2021);
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)
+	rc = video_register_device(&smi2021->vdev, VFL_TYPE_VIDEO, -1);
+#else
 	rc = video_register_device(&smi2021->vdev, VFL_TYPE_GRABBER, -1);
+#endif
 	if (rc < 0) {
 		dev_err(smi2021->dev, "video_register_device failed (%d)\n",
 									rc);
