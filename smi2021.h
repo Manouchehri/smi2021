@@ -35,6 +35,7 @@
 #include <linux/usb.h>
 #include <linux/i2c.h>
 #include <linux/slab.h>
+#include <linux/version.h>
 #include <linux/vmalloc.h>
 
 #include <media/v4l2-device.h>
@@ -235,7 +236,6 @@ struct smi2021 {
 /* Provided by smi2021_bootloader.c */
 int smi2021_bootloader_probe(struct usb_interface *intf,
 					const struct usb_device_id *devid);
-void smi2021_bootloader_disconnect(struct usb_interface *intf);
 
 /* Provided by smi2021_main.c */
 void smi2021_toggle_audio(struct smi2021 *smi2021, bool enable);
