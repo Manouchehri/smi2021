@@ -31,6 +31,7 @@
 #ifndef SMI2021_H
 #define SMI2021_H
 
+#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/usb.h>
 #include <linux/i2c.h>
@@ -61,7 +62,7 @@
 #define SMI2021_DRIVER_VERSION "0.1"GITVERSION
 
 #define SMI2021_ISOC_TRANSFERS	16
-#define SMI2021_ISOC_PACKETS	10
+#define SMI2021_ISOC_PACKETS	64
 #define SMI2021_ISOC_EP		0x82
 
 /* General USB control setup */
